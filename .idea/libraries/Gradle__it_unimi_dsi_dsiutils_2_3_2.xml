@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="Gradle: it.unimi.dsi:dsiutils:2.3.2">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/it.unimi.dsi/dsiutils/2.3.2/2042e54f0509762f8ad94568f995ff1946311383/dsiutils-2.3.2.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/it.unimi.dsi/dsiutils/2.3.2/9249a59e81a91365b28b0709d4aab9ff660d10e7/dsiutils-2.3.2-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
