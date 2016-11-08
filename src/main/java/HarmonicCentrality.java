@@ -2,7 +2,7 @@
  * Created by Eugenio on 11/4/16.
  */
 
-import it.unimi.dsi.webgraph.ImmutableGraph;
+import it.unimi.dsi.webgraph.*;
 import com.martiansoftware.jsap.FlaggedOption;
 import com.martiansoftware.jsap.JSAP;
 import com.martiansoftware.jsap.JSAPException;
@@ -14,10 +14,9 @@ import com.martiansoftware.jsap.UnflaggedOption;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.logging.ProgressLogger;
-import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
-import it.unimi.dsi.webgraph.LazyIntIterator;
-import java.io.IOException;
+
+import java.io.*;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -27,6 +26,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import ch.qos.logback.classic.Logger;
 import org.slf4j.LoggerFactory;
+
+import static jdk.nashorn.internal.objects.NativeString.length;
 
 public class HarmonicCentrality {
     private final ImmutableGraph graph;
@@ -40,6 +41,23 @@ public class HarmonicCentrality {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, JSAPException {
+        args = new String[1];
+        args[0] = "/Users/Eugenio/Desktop/facebook_combined.txt";
+        if (args.length > 0) {
+            try {
+                File input = new File(args[0]);
+                InputStream inputStream = new FileInputStream(input);
 
+                ArcListASCIIGraph arcList = ArcListASCIIGraph.loadOnce(inputStream);
+
+            }
+            catch (FileNotFoundException e) {
+                System.err.println("File not found!");
+            }
+
+        }
+        else {
+            System.out.println("Error: no input graph provided");
+        }
     }
 }
