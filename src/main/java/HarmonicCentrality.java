@@ -2,43 +2,51 @@
  * Created by Eugenio on 11/4/16.
  */
 
-import it.unimi.dsi.webgraph.*;
-import com.martiansoftware.jsap.FlaggedOption;
-import com.martiansoftware.jsap.JSAP;
 import com.martiansoftware.jsap.JSAPException;
-import com.martiansoftware.jsap.JSAPResult;
-import com.martiansoftware.jsap.Parameter;
-import com.martiansoftware.jsap.SimpleJSAP;
-import com.martiansoftware.jsap.Switch;
-import com.martiansoftware.jsap.UnflaggedOption;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
+import it.unimi.dsi.webgraph.algo.BetweennessCentrality;
 
 import java.io.*;
-import java.util.Arrays;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-import ch.qos.logback.classic.Logger;
-import org.slf4j.LoggerFactory;
-
 
 
 public class HarmonicCentrality {
     private final ImmutableGraph graph;
     private final int numberOfThreads;
     public final double[] harmonic;
+    private final ProgressLogger pl;
+    protected final AtomicInteger nextNode;
+    protected volatile boolean stop;
 
-    public HarmonicCentrality(ImmutableGraph graph, int requestedThreads) {
+    public HarmonicCentrality(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
         this.graph = graph;
+        this.pl = pl;
         this.harmonic = new double[graph.numNodes()];
         this.numberOfThreads = requestedThreads != 0?requestedThreads:Runtime.getRuntime().availableProcessors();
+        this.nextNode = new AtomicInteger();
     }
+
+    public HarmonicCentrality(ImmutableGraph graph, ProgressLogger pl) {
+        this(graph, 0, pl);
+    }
+
+    public HarmonicCentrality(ImmutableGraph graph, int requestedThreads) {
+        this(graph, 1, (ProgressLogger)null);
+    }
+
+    public HarmonicCentrality(ImmutableGraph graph) {
+        this(graph, 0);
+    }
+
+    public void compute() throws InterruptedException {
+
+    }
+
 
     public static void main(String[] args) throws IOException, InterruptedException, JSAPException {
         CharSequence basename = "/home/eugenio/Downloads/Graphs/cnr2000/cnr-2000-hc";
