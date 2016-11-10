@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import ch.qos.logback.classic.Logger;
 import org.slf4j.LoggerFactory;
 
-import static jdk.nashorn.internal.objects.NativeString.length;
+
 
 public class HarmonicCentrality {
     private final ImmutableGraph graph;
@@ -41,18 +41,15 @@ public class HarmonicCentrality {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, JSAPException {
-        args = new String[1];
-        args[0] = "/Users/Eugenio/Desktop/facebook_combined.txt";
+        CharSequence basename = "/home/eugenio/Downloads/Graphs/cnr2000/cnr-2000-hc";
         if (args.length > 0) {
             try {
-                File input = new File(args[0]);
-                InputStream inputStream = new FileInputStream(input);
 
-                ArcListASCIIGraph arcList = ArcListASCIIGraph.loadOnce(inputStream);
+                ImmutableGraph graph = ImmutableGraph.loadOffline(basename);
 
-            }
-            catch (FileNotFoundException e) {
-                System.err.println("File not found!");
+
+            } catch (IOException e) {
+                e.printStackTrace();
             }
 
         }
