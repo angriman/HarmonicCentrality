@@ -3,13 +3,16 @@
  */
 
 import com.martiansoftware.jsap.JSAPException;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
+import org.apache.commons.lang.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.Random;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -17,11 +20,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class HarmonicCentrality {
     private static final Logger LOGGER = LoggerFactory.getLogger(HarmonicCentrality.class);
     private final ImmutableGraph graph;
-    private final int numberOfThreads;
+    private final int numberOfThreads; // Available CPUs
     public final double[] harmonic;
     private final ProgressLogger pl;
     protected final AtomicInteger nextNode;
     protected volatile boolean stop;
+    private static final double precision = 0.2;
+    private final int[] randomSamples;
 
     public HarmonicCentrality(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
         this.graph = graph;
@@ -29,6 +34,7 @@ public class HarmonicCentrality {
         this.harmonic = new double[graph.numNodes()];
         this.numberOfThreads = requestedThreads != 0?requestedThreads:Runtime.getRuntime().availableProcessors();
         this.nextNode = new AtomicInteger();
+        this.randomSamples = pickRandomSamples(numberOfSamples());
     }
 
     public HarmonicCentrality(ImmutableGraph graph, ProgressLogger pl) {
@@ -41,6 +47,42 @@ public class HarmonicCentrality {
 
     public HarmonicCentrality(ImmutableGraph graph) {
         this(graph, 0);
+    }
+
+    // Calculates the number of samples according to the required precision> log(n) / epsilon^2
+    private int numberOfSamples() {
+        if (precision <= 0) {
+            return graph.numNodes();
+        }
+
+        if (precision >= 1) {
+            return 1;
+        }
+
+        return (int)Math.ceil(Math.log(graph.numNodes()) / Math.pow(precision, 2));
+    }
+
+    private int[] pickRandomSamples(int k) {
+        int[] samples = new int[k];
+        if (k == graph.numNodes()) {
+            for (int i = 0; i < k; ++i) {
+                samples[i] = i;
+            }
+        }
+        else {
+
+            int count = 0;
+            Random rand = new Random();
+            while (count < k) {
+                int randomNum = rand.nextInt(graph.numNodes());
+                if (!ArrayUtils.contains(samples, randomNum)) {
+                    samples[count] = randomNum;
+                    ++count;
+                }
+            }
+        }
+
+        return samples;
     }
 
     public void compute() throws InterruptedException {
@@ -84,7 +126,11 @@ public class HarmonicCentrality {
     }
 
     private final class IterationThread implements Callable<Void> {
+        private final IntArrayList queue;
 
+        private IterationThread() {
+            this.queue = new IntArrayList(HarmonicCentrality.this.graph.numNodes());
+        }
 
         public Void call() {
             return null;
@@ -96,6 +142,7 @@ public class HarmonicCentrality {
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
         progressLogger.displayFreeMemory = true;
         progressLogger.displayLocalSpeed = true;
+
         try {
 
             ImmutableGraph graph = ImmutableGraph.loadOffline(basename);
