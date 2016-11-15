@@ -18,7 +18,9 @@ import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -33,7 +35,6 @@ import org.slf4j.LoggerFactory;
 
 public class HarmonicCentrality {
     private static final Logger LOGGER = LoggerFactory.getLogger(HarmonicCentrality.class);
-    public static final double DEFAULT_ALPHA = 0.5D;
     private final ImmutableGraph graph;
     public final double[] harmonic;
     private final ProgressLogger pl;
@@ -43,6 +44,8 @@ public class HarmonicCentrality {
     private static final double precision = 0.2;
     private final int[] randomSamples;
     private final double normalization;
+    private boolean topk = false;
+    private static final int DEFAULT_K = 20;
 
     public HarmonicCentrality(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
         this.pl = pl;
@@ -102,10 +105,10 @@ public class HarmonicCentrality {
     }
 
     public void compute() throws InterruptedException {
-        HarmonicCentrality.IterationThread[] thread = new HarmonicCentrality.IterationThread[this.numberOfThreads];
+        HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
 
         for(int executorService = 0; executorService < thread.length; ++executorService) {
-            thread[executorService] = new HarmonicCentrality.IterationThread();
+            thread[executorService] = new HarmonicCentrality.HarmonicApproximationThread();
         }
 
         if(this.pl != null) {
@@ -136,7 +139,29 @@ public class HarmonicCentrality {
             var11.shutdown();
         }
 
-        if(this.pl != null) {
+        if (topk) {
+
+            double[][] h = new double[graph.numNodes()][2];
+            for (int i = 0; i < graph.numNodes(); ++i) {
+                h[i][0] = harmonic[i];
+                h[i][1] = i;
+            }
+
+            Arrays.sort(h, new Comparator<double[]>() {
+                public int compare(double[] e1, double[] e2) {
+                    return (Double.valueOf(e1[0]).compareTo(e2[0]));
+                }
+            });
+
+            int[] topkApxNodes = new int[20];
+            for (int i = 0; i < DEFAULT_K; ++i) {
+                topkApxNodes[i] = (int)(h[graph.numNodes() - 1 - DEFAULT_K + i][1]);
+            }
+
+            // Continue here
+        }
+
+        if (this.pl != null) {
             this.pl.done();
         }
     }
@@ -146,17 +171,20 @@ public class HarmonicCentrality {
                 new Parameter[]{
                         new Switch("expand", 'e', "expand", "Expand the graph to increase speed (no compression)."),
                         new Switch("mapped", 'm', "mapped", "Use loadMapped() to load the graph."),
+                        new Switch("topk" , 'k', "Calculates the exact top-k Harmonic Centralities using the Okamoto et al. algorithm."),
                         new FlaggedOption("threads", JSAP.INTSIZE_PARSER, "0", false, 'T', "threads", "The number of threads to be used. If 0, the number will be estimated automatically."),
                         new UnflaggedOption("graphBasename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The basename of the graph."),
                         new UnflaggedOption("harmonicFilename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The filename where harmonic centrality scores (doubles in binary form) will be stored.")
         });
+
         JSAPResult jsapResult = jsap.parse(arg);
         if(jsap.messagePrinted()) {
             System.exit(1);
         }
 
         boolean mapped = jsapResult.getBoolean("mapped", false);
-        String graphBasename = jsapResult.getString("graphBasename");
+        boolean topk = jsapResult.getBoolean("topk", false);
+        String graphBasename = "./Graphs/" + jsapResult.getString("graphBasename");
         int threads = jsapResult.getInt("threads");
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
         progressLogger.displayFreeMemory = true;
@@ -167,18 +195,70 @@ public class HarmonicCentrality {
         }
 
         HarmonicCentrality centralities = new HarmonicCentrality(graph, threads, progressLogger);
+        centralities.topk = topk;
         centralities.compute();
-        for (double h : centralities.harmonic) {
-            System.out.println(h);
-        }
         BinIO.storeDoubles(centralities.harmonic, jsapResult.getString("harmonicFilename"));
     }
 
-    private final class IterationThread implements Callable<Void> {
+    private final class HarmonicApproximationThread implements Callable<Void> {
         private final IntArrayFIFOQueue queue;
         private final int[] distance;
 
-        private IterationThread() {
+        private HarmonicApproximationThread() {
+            this.distance = new int[HarmonicCentrality.this.graph.numNodes()];
+            this.queue = new IntArrayFIFOQueue();
+        }
+
+        public Void call() {
+            int[] distance = this.distance;
+            IntArrayFIFOQueue queue = this.queue;
+            ImmutableGraph graph = HarmonicCentrality.this.graph.copy();
+
+
+            while(true) {
+                int curr = HarmonicCentrality.this.nextNode.getAndIncrement();
+                if(HarmonicCentrality.this.stop || curr >= randomSamples.length) {
+                    return null;
+                }
+
+                queue.clear();
+                queue.enqueue(randomSamples[curr]);
+                Arrays.fill(distance, -1);
+                distance[randomSamples[curr]] = 0;
+
+                while(!queue.isEmpty()) {
+                    int node = queue.dequeueInt();
+                    int d = distance[node] + 1;
+                    LazyIntIterator successors = graph.successors(node);
+
+                    int s;
+                    while((s = successors.nextInt()) != -1) {
+                        if(distance[s] == -1) {
+                            queue.enqueue(s);
+                            distance[s] = d;
+                        }
+                    }
+                }
+
+                int i = 0;
+                for (int d : distance) {
+                    HarmonicCentrality.this.harmonic[i++] += HarmonicCentrality.this.normalization * ((d > 0) ? 1.0D / (double)d : 0);
+                }
+
+                if(HarmonicCentrality.this.pl != null) {
+                    synchronized(HarmonicCentrality.this.pl) {
+                        HarmonicCentrality.this.pl.update();
+                    }
+                }
+            }
+        }
+    }
+
+    private final class HarmonicExactComputationThread implements Callable<Void> {
+        private final IntArrayFIFOQueue queue;
+        private final int[] distance;
+
+        private HarmonicExactComputationThread() {
             this.distance = new int[HarmonicCentrality.this.graph.numNodes()];
             this.queue = new IntArrayFIFOQueue();
         }
