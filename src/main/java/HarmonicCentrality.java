@@ -33,7 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Implements the Eppstein et al. and Okamoto et al. algorithms for the efficient randomized computation of the Harmonic
- * Centrality. The Eppstein algorithm can be used
+ * Centrality. The Eppstein algorithm can be used by specifying the precision at the end of the command line while the
+ * Okamoto algorithm needs the option -k to be activated and the k specified at the end of the line.
  */
 
 public class HarmonicCentrality {
@@ -44,11 +45,11 @@ public class HarmonicCentrality {
     private final int numberOfThreads;
     protected final AtomicInteger nextNode;
     protected volatile boolean stop;
-    private double precision = 0.2;
+    double precision = 0.2;
     private final int[] randomSamples;
     private final double normalization;
-    private boolean topk = false;
-    private int k = 0;
+    public boolean topk = false;
+    int k = 0;
     private int[] candidateSet;
     private double[] candidateSetHarmonics;
     private static final double ALPHA = 1.01;
