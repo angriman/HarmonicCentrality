@@ -18,7 +18,6 @@ import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Random;
@@ -33,6 +32,10 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Implements the Eppstein et al. and Okamoto et al. algorithms for the efficient randomized computation of the Harmonic
+ * Centrality. The Eppstein algorithm can be used
+ */
+
 public class HarmonicCentrality {
     private static final Logger LOGGER = LoggerFactory.getLogger(HarmonicCentrality.class);
     private final ImmutableGraph graph;
@@ -41,11 +44,14 @@ public class HarmonicCentrality {
     private final int numberOfThreads;
     protected final AtomicInteger nextNode;
     protected volatile boolean stop;
-    private static final double precision = 0.2;
+    private double precision = 0.2;
     private final int[] randomSamples;
     private final double normalization;
     private boolean topk = false;
-    private static final int DEFAULT_K = 20;
+    private int k = 0;
+    private int[] candidateSet;
+    private double[] candidateSetHarmonics;
+    private static final double ALPHA = 1.01;
 
     public HarmonicCentrality(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
         this.pl = pl;
@@ -54,30 +60,13 @@ public class HarmonicCentrality {
         this.nextNode = new AtomicInteger();
         this.numberOfThreads = requestedThreads != 0?requestedThreads:Runtime.getRuntime().availableProcessors();
         this.randomSamples = pickRandomSamples(numberOfSamples());
-        this.normalization = (double)graph.numNodes() / ((double)(randomSamples.length * (graph.numNodes() - 1)));
-    }
-
-    public HarmonicCentrality(ImmutableGraph graph, ProgressLogger pl) {
-        this(graph, 0, pl);
-    }
-
-    public HarmonicCentrality(ImmutableGraph graph, int requestedThreads) {
-        this(graph, 1, (ProgressLogger)null);
-    }
-
-    public HarmonicCentrality(ImmutableGraph graph) {
-        this(graph, 0);
+        this.normalization = (double)graph.numNodes() / (double)randomSamples.length;
     }
 
     private int numberOfSamples() {
-        if (precision <= 0) {
-            return graph.numNodes();
+        if (topk) {
+            return num_samples();
         }
-
-        if (precision >= 1) {
-            return 1;
-        }
-
         return (int)Math.ceil(Math.log(graph.numNodes()) / Math.pow(precision, 2));
     }
 
@@ -89,7 +78,6 @@ public class HarmonicCentrality {
             }
         }
         else {
-
             int count = 0;
             Random rand = new Random();
             while (count < k) {
@@ -102,6 +90,14 @@ public class HarmonicCentrality {
         }
 
         return samples;
+    }
+
+    private int num_samples() {
+        return (int)Math.ceil(Math.pow(graph.numNodes(), 2/3) * Math.pow(Math.log(graph.numNodes()) , 1/3));
+    }
+
+    private double f_function() {
+        return ALPHA * Math.sqrt(Math.log(graph.numNodes()) / randomSamples.length);
     }
 
     public void compute() throws InterruptedException {
@@ -131,40 +127,75 @@ public class HarmonicCentrality {
             while(e-- != 0) {
                 executorCompletionService.take().get();
             }
-        } catch (ExecutionException var9) {
+        }
+        catch (ExecutionException var9) {
             this.stop = true;
             Throwable cause = var9.getCause();
             throw cause instanceof RuntimeException?(RuntimeException)cause:new RuntimeException(cause.getMessage(), cause);
-        } finally {
+        }
+        finally {
             var11.shutdown();
         }
 
         if (topk) {
+            double[][] h = sort(harmonic);
 
-            double[][] h = new double[graph.numNodes()][2];
-            for (int i = 0; i < graph.numNodes(); ++i) {
-                h[i][0] = harmonic[i];
-                h[i][1] = i;
+            int from = k - 1;
+            int additiveSamples = 0;
+            double threshold = 2 * f_function();
+
+            while (h[from + additiveSamples][0] > h[from][0] - threshold) {
+                ++additiveSamples;
             }
 
-            Arrays.sort(h, new Comparator<double[]>() {
-                public int compare(double[] e1, double[] e2) {
-                    return (Double.valueOf(e1[0]).compareTo(e2[0]));
+            candidateSet = new int[k + additiveSamples];
+            candidateSetHarmonics = new double[candidateSet.length];
+            for (int i = 0; i < candidateSet.length; ++i) {
+                candidateSet[i] = (int)(h[graph.numNodes() - 1 - k - additiveSamples + i][1]);
+            }
+
+            HarmonicCentrality.HarmonicExactComputationThread[] exactComputationThreads = new HarmonicCentrality.HarmonicExactComputationThread[this.numberOfThreads];
+            HarmonicCentrality.this.nextNode.set(0);
+
+            for (int executorService = 0; executorService < exactComputationThreads.length; ++executorService) {
+                exactComputationThreads[executorService] = new HarmonicCentrality.HarmonicExactComputationThread();
+            }
+
+            if (this.pl != null) {
+                this.pl.start("Starting visits...");
+                this.pl.expectedUpdates = (long)this.graph.numNodes();
+                this.pl.itemsName = "nodes";
+            }
+
+            var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+            executorCompletionService = new ExecutorCompletionService(var11);
+
+            e = exactComputationThreads.length;
+
+            while(e-- != 0) {
+                executorCompletionService.submit(exactComputationThreads[e]);
+            }
+
+            try {
+                e = exactComputationThreads.length;
+
+                while(e-- != 0) {
+                    executorCompletionService.take().get();
                 }
-            });
-
-            int[] topkApxNodes = new int[20];
-            for (int i = 0; i < DEFAULT_K; ++i) {
-                topkApxNodes[i] = (int)(h[graph.numNodes() - 1 - DEFAULT_K + i][1]);
+            } catch (ExecutionException var9) {
+                this.stop = true;
+                Throwable cause = var9.getCause();
+                throw cause instanceof RuntimeException?(RuntimeException)cause:new RuntimeException(cause.getMessage(), cause);
+            } finally {
+                var11.shutdown();
             }
-
-            // Continue here
         }
 
         if (this.pl != null) {
             this.pl.done();
         }
     }
+
 
     public static void main(String[] arg) throws IOException, JSAPException, InterruptedException {
         SimpleJSAP jsap = new SimpleJSAP(HarmonicCentrality.class.getName(), "Computes positive centralities of a graph using multiple parallel breadth-first visits.\n\nPlease note that to compute negative centralities on directed graphs (which is usually what you want) you have to compute positive centralities on the transpose.",
@@ -174,7 +205,8 @@ public class HarmonicCentrality {
                         new Switch("topk" , 'k', "Calculates the exact top-k Harmonic Centralities using the Okamoto et al. algorithm."),
                         new FlaggedOption("threads", JSAP.INTSIZE_PARSER, "0", false, 'T', "threads", "The number of threads to be used. If 0, the number will be estimated automatically."),
                         new UnflaggedOption("graphBasename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The basename of the graph."),
-                        new UnflaggedOption("harmonicFilename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The filename where harmonic centrality scores (doubles in binary form) will be stored.")
+                        new UnflaggedOption("harmonicFilename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The filename where harmonic centrality scores (doubles in binary form) will be stored."),
+                        new UnflaggedOption("precision/k", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, false, false, "The precision for the Eppstein algorithm or k for Okamoto")
         });
 
         JSAPResult jsapResult = jsap.parse(arg);
@@ -196,8 +228,38 @@ public class HarmonicCentrality {
 
         HarmonicCentrality centralities = new HarmonicCentrality(graph, threads, progressLogger);
         centralities.topk = topk;
+        String prec_k = jsapResult.getString("precision/k");
+
+        if (prec_k != null) {
+            if (topk) {
+                centralities.k = Integer.parseInt(prec_k);
+                if (centralities.k <= 0) {
+                    System.err.println("k must be > 0.");
+                    System.exit(1);
+                }
+            } else {
+                centralities.precision = Double.parseDouble(prec_k);
+                if (centralities.precision > 1 || centralities.precision <= 0) {
+                    System.err.println("The precision value must lay in the [0,1] interval.");
+                    System.exit(1);
+                }
+            }
+        } else {
+            System.err.println((topk ? "k" : "precision") + " not specified");
+            System.exit(1);
+        }
+
         centralities.compute();
-        BinIO.storeDoubles(centralities.harmonic, jsapResult.getString("harmonicFilename"));
+        if (topk) {
+            double[][] result = centralities.sortAndCut();
+            for (double[] x : result) {
+                System.out.println((int)x[1] + ": " + x[0]);
+            }
+            BinIO.storeDoubles(result[2], jsapResult.getString("harmonicFilename"));
+        } else {
+            BinIO.storeDoubles(centralities.harmonic, jsapResult.getString("harmonicFilename"));
+        }
+
     }
 
     private final class HarmonicApproximationThread implements Callable<Void> {
@@ -268,43 +330,69 @@ public class HarmonicCentrality {
             IntArrayFIFOQueue queue = this.queue;
             ImmutableGraph graph = HarmonicCentrality.this.graph.copy();
 
-
-            while(true) {
+            while (true) {
                 int curr = HarmonicCentrality.this.nextNode.getAndIncrement();
-                if(HarmonicCentrality.this.stop || curr >= randomSamples.length) {
+                if (HarmonicCentrality.this.stop || curr >= candidateSet.length) {
                     return null;
                 }
 
                 queue.clear();
-                queue.enqueue(randomSamples[curr]);
+                queue.enqueue(curr);
                 Arrays.fill(distance, -1);
-                distance[randomSamples[curr]] = 0;
+                distance[curr] = 0;
 
-                while(!queue.isEmpty()) {
+                while (!queue.isEmpty()) {
                     int node = queue.dequeueInt();
                     int d = distance[node] + 1;
+                    double hd = 1.0D / (double) d;
                     LazyIntIterator successors = graph.successors(node);
 
                     int s;
-                    while((s = successors.nextInt()) != -1) {
-                        if(distance[s] == -1) {
+                    while ((s = successors.nextInt()) != -1) {
+                        if (distance[s] == -1) {
                             queue.enqueue(s);
                             distance[s] = d;
+                            HarmonicCentrality.this.candidateSetHarmonics[curr] += hd;
                         }
                     }
                 }
 
-                int i = 0;
-                for (int d : distance) {
-                    HarmonicCentrality.this.harmonic[i++] += HarmonicCentrality.this.normalization * ((d > 0) ? 1.0D / (double)d : 0);
-                }
-
-                if(HarmonicCentrality.this.pl != null) {
-                    synchronized(HarmonicCentrality.this.pl) {
+                if (HarmonicCentrality.this.pl != null) {
+                    synchronized (HarmonicCentrality.this.pl) {
                         HarmonicCentrality.this.pl.update();
                     }
                 }
             }
         }
+    }
+
+    private double[][] sort(double[] arr) {
+        double[][] newArr = new double[arr.length][2];
+        for (int i = 0; i < arr.length; ++i) {
+            newArr[i][0] = arr[i];
+            newArr[i][1] = i;
+        }
+        sort(newArr);
+        return newArr;
+    }
+
+    private void sort(double[][] arr) {
+        Arrays.sort(arr, new Comparator<double[]>() {
+            public int compare(double[] e1, double[] e2) {
+                return(Double.valueOf(e2[0]).compareTo(e1[0]));
+            }
+        });
+    }
+
+    private double[][] sortAndCut() {
+        double[][] result = new double[candidateSet.length][2];
+        for (int i = 0; i < candidateSet.length; ++i) {
+            result[i][0] = candidateSetHarmonics[i];
+            result[i][1] = candidateSet[i];
+        }
+        sort(result);
+        double[][] toReturn = new double[k][2];
+        System.arraycopy(result, 0, toReturn, 0, k);
+        return toReturn;
     }
 }
