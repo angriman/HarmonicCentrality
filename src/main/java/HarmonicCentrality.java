@@ -40,32 +40,45 @@ import org.slf4j.LoggerFactory;
 public class HarmonicCentrality {
     private static final Logger LOGGER = LoggerFactory.getLogger(HarmonicCentrality.class);
     private final ImmutableGraph graph;
-    public final double[] harmonic;
+    private final double[] harmonic;
     private final ProgressLogger pl;
     private final int numberOfThreads;
-    protected final AtomicInteger nextNode;
-    protected volatile boolean stop;
+    private final AtomicInteger nextNode;
+    private volatile boolean stop;
     double precision = 0.2;
     private final int[] randomSamples;
     private final double normalization;
-    public boolean topk = false;
+    boolean top_k = false;
     int k = 0;
     private int[] candidateSet;
     private double[] candidateSetHarmonics;
     private static final double ALPHA = 1.01;
 
-    public HarmonicCentrality(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
+    private final AtomicInteger visitedNodes;
+    private final AtomicInteger visitedArcs;
+
+    HarmonicCentrality(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
         this.pl = pl;
         this.graph = graph;
         this.harmonic = new double[graph.numNodes()];
         this.nextNode = new AtomicInteger();
+        this.visitedNodes = new AtomicInteger();
+        this.visitedArcs = new AtomicInteger();
         this.numberOfThreads = requestedThreads != 0?requestedThreads:Runtime.getRuntime().availableProcessors();
         this.randomSamples = pickRandomSamples(numberOfSamples());
         this.normalization = (double)graph.numNodes() / (double)randomSamples.length;
     }
 
+    int visitedNodes() {
+        return this.visitedNodes.get();
+    }
+
+    int visitedArcs() {
+        return this.visitedArcs.get();
+    }
+
     private int numberOfSamples() {
-        if (topk) {
+        if (top_k) {
             return num_samples();
         }
         return (int)Math.ceil(Math.log(graph.numNodes()) / Math.pow(precision, 2));
@@ -101,7 +114,7 @@ public class HarmonicCentrality {
         return ALPHA * Math.sqrt(Math.log(graph.numNodes()) / randomSamples.length);
     }
 
-    public void compute() throws InterruptedException {
+    void compute() throws InterruptedException {
         HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
 
         for(int executorService = 0; executorService < thread.length; ++executorService) {
@@ -118,9 +131,7 @@ public class HarmonicCentrality {
         ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
         int e = thread.length;
 
-        while(e-- != 0) {
-            executorCompletionService.submit(thread[e]);
-        }
+        while(e-- != 0) executorCompletionService.submit(thread[e]);
 
         try {
             e = thread.length;
@@ -138,7 +149,7 @@ public class HarmonicCentrality {
             var11.shutdown();
         }
 
-        if (topk) {
+        if (top_k) {
             double[][] h = sort(harmonic);
 
             int from = k - 1;
@@ -173,9 +184,7 @@ public class HarmonicCentrality {
 
             e = exactComputationThreads.length;
 
-            while(e-- != 0) {
-                executorCompletionService.submit(exactComputationThreads[e]);
-            }
+            while(e-- != 0) executorCompletionService.submit(exactComputationThreads[e]);
 
             try {
                 e = exactComputationThreads.length;
@@ -203,7 +212,7 @@ public class HarmonicCentrality {
                 new Parameter[]{
                         new Switch("expand", 'e', "expand", "Expand the graph to increase speed (no compression)."),
                         new Switch("mapped", 'm', "mapped", "Use loadMapped() to load the graph."),
-                        new Switch("topk" , 'k', "Calculates the exact top-k Harmonic Centralities using the Okamoto et al. algorithm."),
+                        new Switch("top_k" , 'k', "Calculates the exact top-k Harmonic Centralities using the Okamoto et al. algorithm."),
                         new FlaggedOption("threads", JSAP.INTSIZE_PARSER, "0", false, 'T', "threads", "The number of threads to be used. If 0, the number will be estimated automatically."),
                         new UnflaggedOption("graphBasename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The basename of the graph."),
                         new UnflaggedOption("harmonicFilename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The filename where harmonic centrality scores (doubles in binary form) will be stored."),
@@ -216,7 +225,7 @@ public class HarmonicCentrality {
         }
 
         boolean mapped = jsapResult.getBoolean("mapped", false);
-        boolean topk = jsapResult.getBoolean("topk", false);
+        boolean top_k = jsapResult.getBoolean("top_k", false);
         String graphBasename = "./Graphs/" + jsapResult.getString("graphBasename");
         int threads = jsapResult.getInt("threads");
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
@@ -228,11 +237,11 @@ public class HarmonicCentrality {
         }
 
         HarmonicCentrality centralities = new HarmonicCentrality(graph, threads, progressLogger);
-        centralities.topk = topk;
+        centralities.top_k = top_k;
         String prec_k = jsapResult.getString("precision/k");
 
         if (prec_k != null) {
-            if (topk) {
+            if (top_k) {
                 centralities.k = Integer.parseInt(prec_k);
                 if (centralities.k <= 0) {
                     System.err.println("k must be > 0.");
@@ -245,22 +254,12 @@ public class HarmonicCentrality {
                     System.exit(1);
                 }
             }
-        } else {
-            System.err.println((topk ? "k" : "precision") + " not specified");
+        }
+        else {
+            System.err.println((top_k ? "k" : "precision") + " not specified");
             System.exit(1);
         }
-
         centralities.compute();
-        if (topk) {
-            double[][] result = centralities.sortAndCut();
-            for (double[] x : result) {
-                System.out.println((int)x[1] + ": " + x[0]);
-            }
-            BinIO.storeDoubles(result[2], jsapResult.getString("harmonicFilename"));
-        } else {
-            BinIO.storeDoubles(centralities.harmonic, jsapResult.getString("harmonicFilename"));
-        }
-
     }
 
     private final class HarmonicApproximationThread implements Callable<Void> {
@@ -296,8 +295,10 @@ public class HarmonicCentrality {
 
                     int s;
                     while((s = successors.nextInt()) != -1) {
+                        visitedArcs.getAndIncrement();
                         if(distance[s] == -1) {
                             queue.enqueue(s);
+                            visitedNodes.getAndIncrement();
                             distance[s] = d;
                         }
                     }
