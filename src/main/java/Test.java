@@ -4,7 +4,6 @@
 
 
 import com.martiansoftware.jsap.*;
-import com.sun.org.apache.regexp.internal.RE;
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ArrayListMutableGraph;
@@ -20,8 +19,11 @@ import java.util.Arrays;
  *
  */
 public class Test {
+    /* Progress logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(HarmonicCentrality.class);
+    /* Number of warm-up iterations */
     private final static int WARMUP = 0;
+    /* Number of repetition runs */
     private final static int REPEAT = 1;
 
     public static void main(String[] args) throws IOException, JSAPException, InterruptedException {
@@ -36,7 +38,6 @@ public class Test {
                         new UnflaggedOption("harmonicFilename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The filename where harmonic centrality scores (doubles in binary form) will be stored."),
                         new UnflaggedOption("precision/k", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, false, false, "The precision for the Eppstein algorithm or k for Okamoto")
                 });
-
         JSAPResult jsapResult = jsap.parse(args);
         if (jsap.messagePrinted()) {
             System.exit(1);
@@ -84,9 +85,13 @@ public class Test {
 
                 total_visited_nodes += naive ? ((GeometricCentralities)centralities).visitedNodes() : ((HarmonicCentrality)centralities).visitedNodes();
                 total_visited_arcs += naive ? ((GeometricCentralities)centralities).visitedArcs() : ((HarmonicCentrality)centralities).visitedArcs();
-                if (!naive) {
+                if (!naive && !top_k) {
                     double[] exact = BinIO.loadDoubles(jsapResult.getString("harmonicFilename"));
                     System.out.println(Arrays.toString(errors(exact, ((HarmonicCentrality)centralities).harmonic)));
+                }
+                else if (top_k) {
+                    System.out.println( checkTopK(((HarmonicCentrality)centralities).candidateSetHarmonics, jsapResult) ?
+                    "Correct" : "Incorrect");
                 }
             }
 
@@ -130,25 +135,58 @@ public class Test {
         }
     }
 
+    /**
+     * Computes the precision metrics for the Eppstein estimated harmonic centrality vector.
+     * @param exact Vector containing the exact value of the harmonic centrality of each node
+     * @param apx   Vector containing the approximated value of the harmonic centrality of each node
+     * @return      Returns a vector containing the values of the error metrics.
+     */
     private static double[] errors(double[] exact, double[] apx) {
+        /* Average absolute error */
         double avgAbsErr = 0;
+        /* Average relative error */
         double avgRelErr = 0;
+        /* Error variance */
         double errorVariance = 0;
+        /* Average of the exact harmonic centralities */
         double avg = 0;
+        /* Vector containing the values of the error metrics */
         double[] toReturn = new double[3];
+
+        /* For each value in the vectors computes the absolute and the relative errors
+         * and also updates the average */
         for (int i = 0; i < exact.length; ++i) {
-            avgAbsErr += Math.abs(exact[i] - apx[i]) / Math.pow(exact.length, 2);
-            avg += exact[i] / Math.pow(exact.length, 2);
+            avgAbsErr += Math.abs(exact[i] - apx[i]);
+            avg += exact[i];
             double den = exact[i] == 0 ? 1 : exact[i];
-            avgRelErr += Math.abs((exact[i] - apx[i]) / den) / Math.pow(exact.length, 2);
+            avgRelErr += Math.abs((exact[i] - apx[i]) / den);
         }
+
+        /* The harmonic centrality values have never been normalized. We add a normalization term: n*(n-1) */
+        int norm = exact.length * (exact.length - 1);
+        avg /= norm;
 
         for (int i = 0; i < exact.length; ++i) {
             errorVariance += Math.pow((apx[i] / exact.length - avg), 2) / (exact.length - 1);
         }
-        toReturn[0] = avgAbsErr;
-        toReturn[1] = avgRelErr;
+
+        toReturn[0] = avgAbsErr / norm;
+        toReturn[1] = avgRelErr / norm;
         toReturn[2] = errorVariance;
+
         return toReturn;
+    }
+
+    private static boolean checkTopK(double[] topk, JSAPResult jsapResult) throws IOException {
+        double[] exact = BinIO.loadDoubles(jsapResult.getString("harmonicFilename"));
+        int k = Integer.parseInt(jsapResult.getString("precision/k"));
+        Arrays.sort(exact);
+        Arrays.sort(topk);
+        for (int i = 0; i < k; ++i) {
+            if (topk[i] != exact[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 }

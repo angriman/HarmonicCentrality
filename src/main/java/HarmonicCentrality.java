@@ -50,8 +50,17 @@ public class HarmonicCentrality {
     boolean top_k = false;
     int k = 0;
     private int[] candidateSet;
-    private double[] candidateSetHarmonics;
+    public double[] candidateSetHarmonics;
+    /* Multiplicative constant in front of the f_function. Theory tells that it must be > 1.
+    * A high value of ALPHA determines a greater threshold --> greater candidate set.
+    * The formula is: ALPHA * sqrt(log(n) / l) */
     private static final double ALPHA = 1.01;
+    /* Multiplicative function in front of the Okamoto number of random samples formula.
+    * The formula is: number of random samples = BETA * n^(1/3) * log^(2/3)(n) */
+    private static final double BETA = 1;
+    /* Multiplicative constant in front of the Eppstein number of random samples formula.
+    * The formula is: number of samples = log(n) / precision^2 */
+    private static final double C = 0.25;
 
     private final AtomicInteger visitedNodes;
     private final AtomicInteger visitedArcs;
@@ -80,7 +89,7 @@ public class HarmonicCentrality {
         if (top_k) {
             return num_samples();
         }
-        return (int)Math.ceil(Math.log(graph.numNodes()) / Math.pow(precision, 2));
+        return (int)Math.ceil(C * Math.log(graph.numNodes()) / Math.pow(precision, 2));
     }
 
     private int[] pickRandomSamples(int k) {
@@ -106,7 +115,7 @@ public class HarmonicCentrality {
     }
 
     private int num_samples() {
-        return (int)Math.ceil(Math.pow(graph.numNodes(), 2/3) * Math.pow(Math.log(graph.numNodes()) , 1/3));
+        return (int)Math.ceil(BETA * Math.pow(graph.numNodes(), 2/3) * Math.pow(Math.log(graph.numNodes()) , 1/3));
     }
 
     private double f_function() {
