@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 public class HarmonicCentrality {
     private static final Logger LOGGER = LoggerFactory.getLogger(HarmonicCentrality.class);
     private final ImmutableGraph graph;
-    private final double[] harmonic;
+    final double[] harmonic;
     private final ProgressLogger pl;
     private final int numberOfThreads;
     private final AtomicInteger nextNode;
@@ -276,7 +276,7 @@ public class HarmonicCentrality {
             ImmutableGraph graph = HarmonicCentrality.this.graph.copy();
 
 
-            while(true) {
+            while (true) {
                 int curr = HarmonicCentrality.this.nextNode.getAndIncrement();
                 if (HarmonicCentrality.this.stop || curr >= randomSamples.length) {
                     return null;
@@ -287,13 +287,13 @@ public class HarmonicCentrality {
                 Arrays.fill(distance, -1);
                 distance[randomSamples[curr]] = 0;
 
-                while(!queue.isEmpty()) {
+                while (!queue.isEmpty()) {
                     int node = queue.dequeueInt();
                     int d = distance[node] + 1;
                     LazyIntIterator successors = graph.successors(node);
 
                     int s;
-                    while((s = successors.nextInt()) != -1) {
+                    while ((s = successors.nextInt()) != -1) {
                         visitedArcs.getAndIncrement();
                         if(distance[s] == -1) {
                             queue.enqueue(s);
@@ -305,11 +305,11 @@ public class HarmonicCentrality {
 
                 int i = 0;
                 for (int d : distance) {
-                    HarmonicCentrality.this.harmonic[i++] += HarmonicCentrality.this.normalization * ((d > 0) ? 1.0D / (double)d : 0);
+                    HarmonicCentrality.this.harmonic[i++] += HarmonicCentrality.this.normalization * ((d > 0) ? 1.0D / (double) d : 0);
                 }
 
-                if(HarmonicCentrality.this.pl != null) {
-                    synchronized(HarmonicCentrality.this.pl) {
+                if (HarmonicCentrality.this.pl != null) {
+                    synchronized (HarmonicCentrality.this.pl) {
                         HarmonicCentrality.this.pl.update();
                     }
                 }

@@ -4,6 +4,7 @@
 
 
 import com.martiansoftware.jsap.*;
+import com.sun.org.apache.regexp.internal.RE;
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ArrayListMutableGraph;
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
+import java.util.Arrays;
 
 /** Implements a test to measure the algorithms performances in terms of time and precision.
  *
@@ -76,13 +78,16 @@ public class Test {
 
             if (k < REPEAT) {
                 total_time += time;
-                if (naive) {
+                if (naive && k == REPEAT - 1) {
                     BinIO.storeDoubles(((GeometricCentralities)centralities).harmonic, jsapResult.getString("harmonicFilename"));
                 }
 
                 total_visited_nodes += naive ? ((GeometricCentralities)centralities).visitedNodes() : ((HarmonicCentrality)centralities).visitedNodes();
                 total_visited_arcs += naive ? ((GeometricCentralities)centralities).visitedArcs() : ((HarmonicCentrality)centralities).visitedArcs();
-
+                if (!naive) {
+                    double[] exact = BinIO.loadDoubles(jsapResult.getString("harmonicFilename"));
+                    System.out.println(Arrays.toString(errors(exact, ((HarmonicCentrality)centralities).harmonic)));
+                }
             }
 
         }
@@ -123,5 +128,27 @@ public class Test {
             System.err.println((top_k ? "k" : "precision") + " not specified");
             System.exit(1);
         }
+    }
+
+    private static double[] errors(double[] exact, double[] apx) {
+        double avgAbsErr = 0;
+        double avgRelErr = 0;
+        double errorVariance = 0;
+        double avg = 0;
+        double[] toReturn = new double[3];
+        for (int i = 0; i < exact.length; ++i) {
+            avgAbsErr += Math.abs(exact[i] - apx[i]) / Math.pow(exact.length, 2);
+            avg += exact[i] / Math.pow(exact.length, 2);
+            double den = exact[i] == 0 ? 1 : exact[i];
+            avgRelErr += Math.abs((exact[i] - apx[i]) / den) / Math.pow(exact.length, 2);
+        }
+
+        for (int i = 0; i < exact.length; ++i) {
+            errorVariance += Math.pow((apx[i] / exact.length - avg), 2) / (exact.length - 1);
+        }
+        toReturn[0] = avgAbsErr;
+        toReturn[1] = avgRelErr;
+        toReturn[2] = errorVariance;
+        return toReturn;
     }
 }
