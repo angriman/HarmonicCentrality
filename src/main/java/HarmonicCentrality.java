@@ -12,7 +12,6 @@ import com.martiansoftware.jsap.SimpleJSAP;
 import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
-import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
@@ -279,7 +278,7 @@ public class HarmonicCentrality {
 
             while(true) {
                 int curr = HarmonicCentrality.this.nextNode.getAndIncrement();
-                if(HarmonicCentrality.this.stop || curr >= randomSamples.length) {
+                if (HarmonicCentrality.this.stop || curr >= randomSamples.length) {
                     return null;
                 }
 
