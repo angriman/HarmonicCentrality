@@ -17,9 +17,7 @@ import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
@@ -38,33 +36,55 @@ import org.slf4j.LoggerFactory;
 
 public class HarmonicCentrality {
     private static final Logger LOGGER = LoggerFactory.getLogger(HarmonicCentrality.class);
+
+    /** The graph under examination. */
     private final ImmutableGraph graph;
+    /** Harmonic centrality vector. */
     final double[] harmonic;
+    /** Global progress logger. */
     private final ProgressLogger pl;
+    /** Number of threads. */
     private final int numberOfThreads;
+    /** Next node to be visited. */
     private final AtomicInteger nextNode;
+    /** Whether to stop abruptly the visiting process. */
     private volatile boolean stop;
-    double precision = 0.2;
-    private final int[] randomSamples;
-    private final double normalization;
+    /** Required precision for the Eppstein algorithm. */
+    double precision;
+    /** Random samples vector for the Eppstein algorithm. */
+    private int[] randomSamples;
+    /** Normalization term for the Eppstein estimated harmonic centrality value. */
+    private double normalization;
+    /** Whether or not to compute the exact top-k harmonic centralities (using the Okamoto algorithm). */
     boolean top_k = false;
+    /** Number of top-k centralities to compute using the Okamoto algorithm. */
     int k = 0;
+    /** Candidate set vector for the Okamoto algorithm. */
     private int[] candidateSet;
-    public double[] candidateSetHarmonics;
-    /* Multiplicative constant in front of the f_function. Theory tells that it must be > 1.
+    /** Corresponding value of the harmonic centrality of the nodes inside the candidate set. */
+    double[] candidateSetHarmonics;
+    /** Multiplicative constant in front of the f_function. Theory tells that it must be > 1.
     * A high value of ALPHA determines a greater threshold --> greater candidate set.
     * The formula is: ALPHA * sqrt(log(n) / l) */
-    private static final double ALPHA = 1.01;
-    /* Multiplicative function in front of the Okamoto number of random samples formula.
+    private static final double ALPHA = 1.1;
+    /** Multiplicative function in front of the Okamoto number of random samples formula.
     * The formula is: number of random samples = BETA * n^(1/3) * log^(2/3)(n) */
     private static final double BETA = 1;
-    /* Multiplicative constant in front of the Eppstein number of random samples formula.
+    /** Multiplicative constant in front of the Eppstein number of random samples formula.
     * The formula is: number of samples = log(n) / precision^2 */
     private static final double C = 0.25;
-
+    /** Number of total visited nodes. */
     private final AtomicInteger visitedNodes;
+    /** Number of total visited arcs. */
     private final AtomicInteger visitedArcs;
 
+    /** Creates a new instance of this class for the computation of the harmonic centrality using efficient randomized
+     * algorithms.
+     *
+     * @param graph the input graph.
+     * @param requestedThreads  requested number of threads (0 for {@link Runtime#availableProcessors()}).
+     * @param pl a global progress logger, or {@code null}.
+     */
     HarmonicCentrality(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
         this.pl = pl;
         this.graph = graph;
@@ -72,64 +92,106 @@ public class HarmonicCentrality {
         this.nextNode = new AtomicInteger();
         this.visitedNodes = new AtomicInteger();
         this.visitedArcs = new AtomicInteger();
-        this.numberOfThreads = requestedThreads != 0?requestedThreads:Runtime.getRuntime().availableProcessors();
-        this.randomSamples = pickRandomSamples(numberOfSamples());
-        this.normalization = (double)graph.numNodes() / (double)randomSamples.length;
+        this.numberOfThreads = requestedThreads != 0 ? requestedThreads:Runtime.getRuntime().availableProcessors();
     }
 
+    /**
+     * @return the number of visited nodes.
+     */
     int visitedNodes() {
         return this.visitedNodes.get();
     }
 
+    /**
+     * @return the number of visited arcs.
+     */
     int visitedArcs() {
         return this.visitedArcs.get();
     }
 
+    /**
+     * @return the number of extracted random samples.
+     */
+    int randomSamples() {
+        return randomSamples.length;
+    }
+
+    /**
+     * @return the number of further samples added to the candidate set.
+     */
+    int additiveSamples() {
+        return candidateSet.length;
+    }
+    /** Computes the number of random samples to be computed according to the algorithm.
+     *
+     * @return the number of random samples.
+     */
     private int numberOfSamples() {
+        /* Okamoto algorithm: it needs BETA * n^(2/3) * (log(n))^(1/3) nodes. */
         if (top_k) {
-            return num_samples();
+            return (int)Math.ceil(BETA * Math.cbrt(Math.pow(graph.numNodes(), 2) * Math.log(graph.numNodes())));
         }
+        /* Eppstein algorithm, it needs C * log(n) / epsilon^2 nodes. */
         return (int)Math.ceil(C * Math.log(graph.numNodes()) / Math.pow(precision, 2));
     }
 
+    /** Computes k unique random samples computed uniformly at random.
+     *
+     * @param k number of random samples to be computed.
+     * @return  a k-long integer array containing k unique random samples.
+     */
     private int[] pickRandomSamples(int k) {
-        int[] samples = new int[k];
-        if (k == graph.numNodes()) {
-            for (int i = 0; i < k; ++i) {
-                samples[i] = i;
-            }
+        /* Check whether 0 < k <= n. */
+        if (k >= graph.numNodes()) {
+            System.err.println("Number of random samples to be extracted greater than n.");
+            System.exit(1);
         }
-        else {
-            int count = 0;
-            Random rand = new Random();
-            while (count < k) {
-                int randomNum = rand.nextInt(graph.numNodes());
-                if (!ArrayUtils.contains(samples, randomNum)) {
-                    samples[count] = randomNum;
-                    ++count;
-                }
-            }
+        if (k < 0) {
+            System.err.println("Negative number of random samples.");
+            System.exit(1);
         }
 
-        return samples;
+        /* Tree structure for better performances. */
+        TreeSet<Integer> set = new TreeSet<Integer>();
+        /* How many different samples have been extracted at each loop. */
+        int count = 0;
+        /* For integer random extraction. */
+        Random rand = new Random();
+
+        /* Keep on looping until k unique random samples have been extracted. */
+        while (count < k) {
+            int randomNum = rand.nextInt(graph.numNodes());
+            if (!set.contains(randomNum)) {
+                set.add(randomNum);
+                ++count;
+            }
+        }
+        System.out.println(k);
+        return ArrayUtils.toPrimitive(set.toArray(new Integer[set.size()]));
     }
 
-    private int num_samples() {
-        return (int)Math.ceil(BETA * Math.pow(graph.numNodes(), 2/3) * Math.pow(Math.log(graph.numNodes()) , 1/3));
-    }
-
+    /** f(l) function used by the Okamoto algorithm.
+     *
+     * @return the threshold to be used to calculate the candidate set.
+     */
     private double f_function() {
         return ALPHA * Math.sqrt(Math.log(graph.numNodes()) / randomSamples.length);
     }
 
+    /** Computes the harmonic centralities using the required algorithm.
+     *
+     * @throws InterruptedException
+     */
     void compute() throws InterruptedException {
+        randomSamples = pickRandomSamples(numberOfSamples());
+        normalization = (double)graph.numNodes() / (double)randomSamples.length;
         HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
 
         for(int executorService = 0; executorService < thread.length; ++executorService) {
             thread[executorService] = new HarmonicCentrality.HarmonicApproximationThread();
         }
 
-        if(this.pl != null) {
+        if (this.pl != null) {
             this.pl.start("Starting visits...");
             this.pl.expectedUpdates = (long)this.graph.numNodes();
             this.pl.itemsName = "nodes";
@@ -214,7 +276,6 @@ public class HarmonicCentrality {
         }
     }
 
-
     public static void main(String[] arg) throws IOException, JSAPException, InterruptedException {
         SimpleJSAP jsap = new SimpleJSAP(HarmonicCentrality.class.getName(), "Computes positive centralities of a graph using multiple parallel breadth-first visits.\n\nPlease note that to compute negative centralities on directed graphs (which is usually what you want) you have to compute positive centralities on the transpose.",
                 new Parameter[]{
@@ -270,6 +331,9 @@ public class HarmonicCentrality {
         centralities.compute();
     }
 
+    /** Thread for the estimation of the harmonic centrality of a single node using the Eppstein algorithm.
+     *
+     */
     private final class HarmonicApproximationThread implements Callable<Void> {
         private final IntArrayFIFOQueue queue;
         private final int[] distance;
@@ -326,6 +390,9 @@ public class HarmonicCentrality {
         }
     }
 
+    /** Thread for the computation of the exact value of the harmonic centrality using the naive algorithm.
+     *  We use it just for the candidate set.S
+     */
     private final class HarmonicExactComputationThread implements Callable<Void> {
         private final IntArrayFIFOQueue queue;
         private final int[] distance;
@@ -376,6 +443,11 @@ public class HarmonicCentrality {
         }
     }
 
+    /** Sorts a double array by keeping track of the corresponding index. It is useful in order to not losing
+     *  the association between the nodes and their harmonic centrality value.
+     * @param arr the input array (contains the harmonic centrality values corresponding to each node)
+     * @return a 2D array: first [harmonic_centrality_value][corresponding_node_id].
+     */
     private double[][] sort(double[] arr) {
         double[][] newArr = new double[arr.length][2];
         for (int i = 0; i < arr.length; ++i) {
@@ -386,6 +458,10 @@ public class HarmonicCentrality {
         return newArr;
     }
 
+    /** Sorts a 2D array with respect to the value contained in the 1st dimension.
+     *
+     * @param arr the sorted array
+     */
     private void sort(double[][] arr) {
         Arrays.sort(arr, new Comparator<double[]>() {
             public int compare(double[] e1, double[] e2) {
@@ -394,6 +470,10 @@ public class HarmonicCentrality {
         });
     }
 
+    /** Sorts and returns the top-k harmonic centralities inside the candidate set array including the corresponding
+     * node id.
+     * @return
+     */
     private double[][] sortAndCut() {
         double[][] result = new double[candidateSet.length][2];
         for (int i = 0; i < candidateSet.length; ++i) {

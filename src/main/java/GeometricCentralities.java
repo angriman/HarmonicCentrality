@@ -32,20 +32,20 @@ public class GeometricCentralities {
     private static final Logger LOGGER = LoggerFactory.getLogger(GeometricCentralities.class);
     public static final double DEFAULT_ALPHA = 0.5D;
     private final ImmutableGraph graph;
-    public final double[] harmonic;
-    public final double[] closeness;
-    public final double[] lin;
-    public final double[] exponential;
-    public double alpha;
-    public final long[] reachable;
+    final double[] harmonic;
+    private final double[] closeness;
+    private final double[] lin;
+    private final double[] exponential;
+    private double alpha;
+    private final long[] reachable;
     private final ProgressLogger pl;
     private final int numberOfThreads;
-    protected final AtomicInteger nextNode;
-    protected volatile boolean stop;
+    private final AtomicInteger nextNode;
+    private volatile boolean stop;
     private final AtomicInteger visitedNodes;
     private final AtomicInteger visitedArcs;
 
-    public GeometricCentralities(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
+    GeometricCentralities(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
         this.pl = pl;
         this.graph = graph;
         this.harmonic = new double[graph.numNodes()];
@@ -60,11 +60,11 @@ public class GeometricCentralities {
         this.visitedArcs = new AtomicInteger();
     }
 
-    public int visitedNodes() {
+    int visitedNodes() {
         return visitedNodes.get();
     }
 
-    public int visitedArcs() {
+    int visitedArcs() {
         return visitedArcs.get();
     }
 
@@ -72,7 +72,7 @@ public class GeometricCentralities {
         this(graph, 0, pl);
     }
 
-    public GeometricCentralities(ImmutableGraph graph, int requestedThreads) {
+    private GeometricCentralities(ImmutableGraph graph, int requestedThreads) {
         this(graph, 1, (ProgressLogger)null);
     }
 
@@ -80,7 +80,7 @@ public class GeometricCentralities {
         this(graph, 0);
     }
 
-    public void compute() throws InterruptedException {
+    void compute() throws InterruptedException {
         GeometricCentralities.IterationThread[] thread = new GeometricCentralities.IterationThread[this.numberOfThreads];
 
         for(int executorService = 0; executorService < thread.length; ++executorService) {

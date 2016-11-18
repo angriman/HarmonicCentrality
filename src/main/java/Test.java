@@ -19,11 +19,11 @@ import java.util.Arrays;
  *
  */
 public class Test {
-    /* Progress logger */
+    /** Progress logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(HarmonicCentrality.class);
-    /* Number of warm-up iterations */
+    /** Number of warm-up iterations */
     private final static int WARMUP = 0;
-    /* Number of repetition runs */
+    /** Number of repetition runs */
     private final static int REPEAT = 1;
 
     public static void main(String[] args) throws IOException, JSAPException, InterruptedException {
@@ -85,13 +85,16 @@ public class Test {
 
                 total_visited_nodes += naive ? ((GeometricCentralities)centralities).visitedNodes() : ((HarmonicCentrality)centralities).visitedNodes();
                 total_visited_arcs += naive ? ((GeometricCentralities)centralities).visitedArcs() : ((HarmonicCentrality)centralities).visitedArcs();
-                if (!naive && !top_k) {
-                    double[] exact = BinIO.loadDoubles(jsapResult.getString("harmonicFilename"));
-                    System.out.println(Arrays.toString(errors(exact, ((HarmonicCentrality)centralities).harmonic)));
-                }
-                else if (top_k) {
-                    System.out.println( checkTopK(((HarmonicCentrality)centralities).candidateSetHarmonics, jsapResult) ?
-                    "Correct" : "Incorrect");
+                if (!naive) {
+                    System.out.println("Random samples = " + ((HarmonicCentrality)centralities).randomSamples());
+                    if (!top_k) {
+                        double[] exact = BinIO.loadDoubles(jsapResult.getString("harmonicFilename"));
+                        System.out.println(Arrays.toString(errors(exact, ((HarmonicCentrality) centralities).harmonic)));
+                    } else {
+                        System.out.println("Additive samples = " + ((HarmonicCentrality)centralities).additiveSamples());
+                        System.out.println(checkTopK(((HarmonicCentrality) centralities).candidateSetHarmonics, jsapResult) ?
+                                "Correct" : "Incorrect");
+                    }
                 }
             }
 
