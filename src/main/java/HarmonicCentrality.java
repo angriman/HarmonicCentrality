@@ -60,13 +60,13 @@ public class HarmonicCentrality {
     /** Number of top-k centralities to compute using the Okamoto algorithm. */
     int k = 0;
     /** Candidate set vector for the Okamoto algorithm. */
-    private int[] candidateSet;
+    int[] candidateSet;
     /** Corresponding value of the harmonic centrality of the nodes inside the candidate set. */
     double[] candidateSetHarmonics;
     /** Multiplicative constant in front of the f_function. Theory tells that it must be > 1.
     * A high value of ALPHA determines a greater threshold --> greater candidate set.
     * The formula is: ALPHA * sqrt(log(n) / l) */
-    private static final double ALPHA = 1.1;
+    private static final double ALPHA = 1.01;
     /** Multiplicative function in front of the Okamoto number of random samples formula.
     * The formula is: number of random samples = BETA * n^(1/3) * log^(2/3)(n) */
     private static final double BETA = 1;
@@ -120,7 +120,7 @@ public class HarmonicCentrality {
      * @return the number of further samples added to the candidate set.
      */
     int additiveSamples() {
-        return candidateSet.length;
+        return candidateSet.length - k;
     }
     /** Computes the number of random samples to be computed according to the algorithm.
      *
@@ -166,7 +166,6 @@ public class HarmonicCentrality {
                 ++count;
             }
         }
-        System.out.println(k);
         return ArrayUtils.toPrimitive(set.toArray(new Integer[set.size()]));
     }
 
@@ -184,7 +183,7 @@ public class HarmonicCentrality {
      */
     void compute() throws InterruptedException {
         randomSamples = pickRandomSamples(numberOfSamples());
-        normalization = (double)graph.numNodes() / (double)randomSamples.length;
+        normalization = (double)graph.numNodes() / ((double)(graph.numNodes() - 1) * (double)randomSamples.length);
         HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
 
         for(int executorService = 0; executorService < thread.length; ++executorService) {
@@ -225,15 +224,14 @@ public class HarmonicCentrality {
             int from = k - 1;
             int additiveSamples = 0;
             double threshold = 2 * f_function();
-
-            while (h[from + additiveSamples][0] > h[from][0] - threshold) {
+            while (from + additiveSamples < graph.numNodes() && h[from + additiveSamples][0] >= h[from][0] - threshold) {
                 ++additiveSamples;
             }
 
-            candidateSet = new int[k + additiveSamples];
+            candidateSet = new int[from + additiveSamples];
             candidateSetHarmonics = new double[candidateSet.length];
+
             for (int i = 0; i < candidateSet.length; ++i) {
-                //candidateSet[i] = (int)(h[graph.numNodes() - 1 - k - additiveSamples + i][1]);
                 candidateSet[i] = (int)h[i][1];
             }
 
@@ -364,6 +362,7 @@ public class HarmonicCentrality {
                 while (!queue.isEmpty()) {
                     int node = queue.dequeueInt();
                     int d = distance[node] + 1;
+                    double hd = 1.0D / (double) d;
                     LazyIntIterator successors = graph.successors(node);
 
                     int s;
@@ -373,13 +372,9 @@ public class HarmonicCentrality {
                             queue.enqueue(s);
                             visitedNodes.getAndIncrement();
                             distance[s] = d;
+                            HarmonicCentrality.this.harmonic[s] += normalization * hd;
                         }
                     }
-                }
-
-                int i = 0;
-                for (int d : distance) {
-                    HarmonicCentrality.this.harmonic[i++] += HarmonicCentrality.this.normalization * ((d > 0) ? 1.0D / (double) d : 0);
                 }
 
                 if (HarmonicCentrality.this.pl != null) {
@@ -419,15 +414,17 @@ public class HarmonicCentrality {
                 Arrays.fill(distance, -1);
                 distance[candidateSet[curr]] = 0;
 
-                while (!queue.isEmpty()) {
+                while(!queue.isEmpty()) {
                     int node = queue.dequeueInt();
                     int d = distance[node] + 1;
-                    double hd = 1.0D / (double) d;
+                    double hd = 1.0D / ((double)d * (double)(graph.numNodes() - 1));
                     LazyIntIterator successors = graph.successors(node);
 
                     int s;
-                    while ((s = successors.nextInt()) != -1) {
-                        if (distance[s] == -1) {
+                    while((s = successors.nextInt()) != -1) {
+                        visitedArcs.getAndIncrement();
+                        if(distance[s] == -1) {
+                            visitedNodes.getAndIncrement();
                             queue.enqueue(s);
                             distance[s] = d;
                             HarmonicCentrality.this.candidateSetHarmonics[curr] += hd;
@@ -449,7 +446,7 @@ public class HarmonicCentrality {
      * @param arr the input array (contains the harmonic centrality values corresponding to each node)
      * @return a 2D array: first [harmonic_centrality_value][corresponding_node_id].
      */
-    private double[][] sort(double[] arr) {
+    public static double[][] sort(double[] arr) {
         double[][] newArr = new double[arr.length][2];
         for (int i = 0; i < arr.length; ++i) {
             newArr[i][0] = arr[i];
@@ -463,7 +460,7 @@ public class HarmonicCentrality {
      *
      * @param arr the sorted array
      */
-    private void sort(double[][] arr) {
+    public static void sort(double[][] arr) {
         Arrays.sort(arr, new Comparator<double[]>() {
             public int compare(double[] e1, double[] e2) {
                 return(Double.valueOf(e2[0]).compareTo(e1[0]));
@@ -471,19 +468,4 @@ public class HarmonicCentrality {
         });
     }
 
-    /** Sorts and returns the top-k harmonic centralities inside the candidate set array including the corresponding
-     * node id.
-     * @return
-     */
-    private double[][] sortAndCut() {
-        double[][] result = new double[candidateSet.length][2];
-        for (int i = 0; i < candidateSet.length; ++i) {
-            result[i][0] = candidateSetHarmonics[i];
-            result[i][1] = candidateSet[i];
-        }
-        sort(result);
-        double[][] toReturn = new double[k][2];
-        System.arraycopy(result, 0, toReturn, 0, k);
-        return toReturn;
-    }
 }

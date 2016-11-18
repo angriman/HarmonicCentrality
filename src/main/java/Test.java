@@ -8,6 +8,7 @@ import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
+import it.unimi.dsi.webgraph.Transform;
 import org.apache.commons.lang.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +16,6 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 
 /** Implements a test to measure the algorithms performances in terms of time and precision.
@@ -55,7 +55,7 @@ public class Test {
         progressLogger.displayFreeMemory = true;
         progressLogger.displayLocalSpeed = true;
         ImmutableGraph graph = mapped ? ImmutableGraph.loadMapped(graphBasename, progressLogger) : ImmutableGraph.load(graphBasename, progressLogger);
-
+        graph = Transform.symmetrize(graph);
         if (jsapResult.userSpecified("expand")) {
             graph = (new ArrayListMutableGraph(graph)).immutableView();
         }
@@ -92,16 +92,21 @@ public class Test {
                     System.out.println("Random samples = " + ((HarmonicCentrality)centralities).randomSamples());
                     if (!top_k) {
                         double[] exact = BinIO.loadDoubles(jsapResult.getString("harmonicFilename"));
+                        int i = 0;
+                        for (double ignored : exact) {
+                            exact[i] /= graph.numNodes() - 1;
+                        }
+
                         System.out.println(Arrays.toString(errors(exact, ((HarmonicCentrality) centralities).harmonic)));
                     } else {
                         System.out.println("Additive samples = " + ((HarmonicCentrality)centralities).additiveSamples());
-                        System.out.println(checkTopK(((HarmonicCentrality) centralities).candidateSetHarmonics, jsapResult) ?
+                        System.out.println(checkTopK(((HarmonicCentrality) centralities).candidateSetHarmonics, ((HarmonicCentrality)centralities).candidateSet, jsapResult) ?
                                 "Correct" : "Incorrect");
                     }
                 }
             }
-
         }
+
         final double averageTime = total_time / (double)REPEAT;
         System.out.println("Num nodes = " + graph.numNodes());
         System.out.println("Num arcs = " + graph.numArcs());
@@ -159,51 +164,47 @@ public class Test {
         /* Vector containing the values of the error metrics */
         double[] toReturn = new double[3];
 
+        double normalization = exact.length - 1;
+
         /* For each value in the vectors computes the absolute and the relative errors
          * and also updates the average */
         for (int i = 0; i < exact.length; ++i) {
-            avgAbsErr += Math.abs(exact[i] - apx[i]);
-            avg += exact[i];
+            avgAbsErr += Math.abs(exact[i] /normalization  - apx[i]);
+            avg += exact[i] / normalization;
             double den = exact[i] == 0 ? 1 : exact[i];
-            avgRelErr += Math.abs((exact[i] - apx[i]) / den);
+            avgRelErr += Math.abs((exact[i] / normalization - apx[i]) / den);
         }
 
         /* The harmonic centrality values have never been normalized. We add a normalization term: n*(n-1) */
-        int norm = exact.length * (exact.length - 1);
-        avg /= norm;
+
+        avg /= exact.length;
 
         for (int i = 0; i < exact.length; ++i) {
-            errorVariance += Math.pow((apx[i] / exact.length - avg), 2) / (exact.length - 1);
+            errorVariance += Math.pow((apx[i] - avg), 2) / (exact.length - 1);
         }
 
-        toReturn[0] = avgAbsErr / norm;
-        toReturn[1] = avgRelErr / norm;
+        toReturn[0] = avgAbsErr / exact.length;
+        toReturn[1] = avgRelErr / exact.length;
         toReturn[2] = errorVariance;
 
         return toReturn;
     }
 
-    private static boolean checkTopK(double[] topk, JSAPResult jsapResult) throws IOException {
+    private static boolean checkTopK(double[] topk, int[] indexes, JSAPResult jsapResult) throws IOException {
         double[] exact = BinIO.loadDoubles(jsapResult.getString("harmonicFilename"));
         int k = Integer.parseInt(jsapResult.getString("precision/k"));
-
-        Double[] sortedExact = ArrayUtils.toObject(exact);
-        Double[] sortedTopk = ArrayUtils.toObject(topk);
-        Arrays.sort(sortedExact, new DoubleComparator());
-        Arrays.sort(sortedTopk, new DoubleComparator());
-
+        double[][] sortedExact = HarmonicCentrality.sort(exact);
+        double[][] sortedTopk = new double[topk.length][2];
+        for (int i = 0; i < topk.length; ++i) {
+            sortedTopk[i][0] = topk[i];
+            sortedTopk[i][1] = indexes[i];
+        }
+        HarmonicCentrality.sort(sortedTopk);
         for (int i = 0; i < k; ++i) {
-            if (topk[i] != exact[i]) {
+            if (!((int)sortedExact[i][1] == (int)(sortedTopk[i][1]))) {
                 return false;
             }
         }
         return true;
-    }
-
-    private static class DoubleComparator implements Comparator<Double> {
-
-        public int compare(Double a1, Double a2) {
-            return a2.compareTo(a1);
-        }
     }
 }
