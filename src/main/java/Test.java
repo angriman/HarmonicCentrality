@@ -49,7 +49,7 @@ public class Test {
         boolean mapped = jsapResult.getBoolean("mapped", false);
         boolean top_k = jsapResult.getBoolean("top_k", false);
         boolean naive = jsapResult.getBoolean("naive", false);
-        String graphBasename = "./Graphs/" + jsapResult.getString("graphBasename");
+        String graphBasename = "./Graphs/" + jsapResult.getString("graphBasename") + "/" + jsapResult.getString("graphBasename");
         int threads = jsapResult.getInt("threads");
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
         progressLogger.displayFreeMemory = true;
