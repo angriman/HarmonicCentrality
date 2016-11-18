@@ -223,7 +223,7 @@ public class HarmonicCentrality {
 
             int from = k - 1;
             int additiveSamples = 0;
-            double threshold = 2 * f_function();
+            double threshold = f_function();
             while (from + additiveSamples < graph.numNodes() && h[from + additiveSamples][0] >= h[from][0] - threshold) {
                 ++additiveSamples;
             }
