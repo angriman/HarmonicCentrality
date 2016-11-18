@@ -233,7 +233,8 @@ public class HarmonicCentrality {
             candidateSet = new int[k + additiveSamples];
             candidateSetHarmonics = new double[candidateSet.length];
             for (int i = 0; i < candidateSet.length; ++i) {
-                candidateSet[i] = (int)(h[graph.numNodes() - 1 - k - additiveSamples + i][1]);
+                //candidateSet[i] = (int)(h[graph.numNodes() - 1 - k - additiveSamples + i][1]);
+                candidateSet[i] = (int)h[i][1];
             }
 
             HarmonicCentrality.HarmonicExactComputationThread[] exactComputationThreads = new HarmonicCentrality.HarmonicExactComputationThread[this.numberOfThreads];
@@ -414,9 +415,9 @@ public class HarmonicCentrality {
                 }
 
                 queue.clear();
-                queue.enqueue(curr);
+                queue.enqueue(candidateSet[curr]);
                 Arrays.fill(distance, -1);
-                distance[curr] = 0;
+                distance[candidateSet[curr]] = 0;
 
                 while (!queue.isEmpty()) {
                     int node = queue.dequeueInt();

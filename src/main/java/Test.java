@@ -8,12 +8,15 @@ import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
+import org.apache.commons.lang.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 
 /** Implements a test to measure the algorithms performances in terms of time and precision.
  *
@@ -183,13 +186,24 @@ public class Test {
     private static boolean checkTopK(double[] topk, JSAPResult jsapResult) throws IOException {
         double[] exact = BinIO.loadDoubles(jsapResult.getString("harmonicFilename"));
         int k = Integer.parseInt(jsapResult.getString("precision/k"));
-        Arrays.sort(exact);
-        Arrays.sort(topk);
+
+        Double[] sortedExact = ArrayUtils.toObject(exact);
+        Double[] sortedTopk = ArrayUtils.toObject(topk);
+        Arrays.sort(sortedExact, new DoubleComparator());
+        Arrays.sort(sortedTopk, new DoubleComparator());
+
         for (int i = 0; i < k; ++i) {
             if (topk[i] != exact[i]) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static class DoubleComparator implements Comparator<Double> {
+
+        public int compare(Double a1, Double a2) {
+            return a2.compareTo(a1);
+        }
     }
 }
