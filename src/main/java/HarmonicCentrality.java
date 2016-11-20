@@ -55,8 +55,10 @@ public class HarmonicCentrality {
     private int[] randomSamples;
     /** Normalization term for the Eppstein estimated harmonic centrality value. */
     private double normalization;
-    /** Whether or not to compute the exact top-k harmonic centralities (using the Okamoto algorithm). */
+    /** Whether or not to compute the exact top-k harmonic centralities using the Okamoto algorithm. */
     boolean top_k = false;
+    /** Whether or not to compute the exact top-k harmonic centralities using the Borassi et al. algorithm. */
+    boolean borassi = false;
     /** Number of top-k centralities to compute using the Okamoto algorithm. */
     int k = 0;
     /** Candidate set vector for the Okamoto algorithm. */
@@ -182,89 +184,122 @@ public class HarmonicCentrality {
      * @throws InterruptedException
      */
     void compute() throws InterruptedException {
-        randomSamples = pickRandomSamples(numberOfSamples());
-        normalization = (double)graph.numNodes() / ((double)(graph.numNodes() - 1) * (double)randomSamples.length);
-        HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
+        if (!borassi) {
+            randomSamples = pickRandomSamples(numberOfSamples());
+            normalization = (double) graph.numNodes() / ((double) (graph.numNodes() - 1) * (double) randomSamples.length);
+            HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
 
-        for(int executorService = 0; executorService < thread.length; ++executorService) {
-            thread[executorService] = new HarmonicCentrality.HarmonicApproximationThread();
-        }
-
-        if (this.pl != null) {
-            this.pl.start("Starting visits...");
-            this.pl.expectedUpdates = (long)this.graph.numNodes();
-            this.pl.itemsName = "nodes";
-        }
-
-        ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
-        int e = thread.length;
-
-        while(e-- != 0) executorCompletionService.submit(thread[e]);
-
-        try {
-            e = thread.length;
-
-            while(e-- != 0) {
-                executorCompletionService.take().get();
-            }
-        }
-        catch (ExecutionException var9) {
-            this.stop = true;
-            Throwable cause = var9.getCause();
-            throw cause instanceof RuntimeException?(RuntimeException)cause:new RuntimeException(cause.getMessage(), cause);
-        }
-        finally {
-            var11.shutdown();
-        }
-
-        if (top_k) {
-            double[][] h = sort(harmonic);
-
-            int from = k - 1;
-            int additiveSamples = 0;
-            double threshold = f_function();
-            while (from + additiveSamples < graph.numNodes() && h[from + additiveSamples][0] >= h[from][0] - threshold) {
-                ++additiveSamples;
-            }
-
-            candidateSet = new int[from + additiveSamples];
-            candidateSetHarmonics = new double[candidateSet.length];
-
-            for (int i = 0; i < candidateSet.length; ++i) {
-                candidateSet[i] = (int)h[i][1];
-            }
-
-            HarmonicCentrality.HarmonicExactComputationThread[] exactComputationThreads = new HarmonicCentrality.HarmonicExactComputationThread[this.numberOfThreads];
-            HarmonicCentrality.this.nextNode.set(0);
-
-            for (int executorService = 0; executorService < exactComputationThreads.length; ++executorService) {
-                exactComputationThreads[executorService] = new HarmonicCentrality.HarmonicExactComputationThread();
+            for (int executorService = 0; executorService < thread.length; ++executorService) {
+                thread[executorService] = new HarmonicCentrality.HarmonicApproximationThread();
             }
 
             if (this.pl != null) {
                 this.pl.start("Starting visits...");
-                this.pl.expectedUpdates = (long)this.graph.numNodes();
+                this.pl.expectedUpdates = (long) this.graph.numNodes();
                 this.pl.itemsName = "nodes";
             }
 
-            var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-            executorCompletionService = new ExecutorCompletionService(var11);
+            ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+            ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
+            int e = thread.length;
 
-            e = exactComputationThreads.length;
-
-            while(e-- != 0) executorCompletionService.submit(exactComputationThreads[e]);
+            while (e-- != 0) executorCompletionService.submit(thread[e]);
 
             try {
-                e = exactComputationThreads.length;
+                e = thread.length;
 
-                while(e-- != 0) {
+                while (e-- != 0) {
                     executorCompletionService.take().get();
                 }
             } catch (ExecutionException var9) {
                 this.stop = true;
                 Throwable cause = var9.getCause();
-                throw cause instanceof RuntimeException?(RuntimeException)cause:new RuntimeException(cause.getMessage(), cause);
+                throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
+            } finally {
+                var11.shutdown();
+            }
+
+            if (top_k) {
+                double[][] h = sort(harmonic);
+
+                int from = k - 1;
+                int additiveSamples = 0;
+                double threshold = f_function();
+                while (from + additiveSamples < graph.numNodes() && h[from + additiveSamples][0] >= h[from][0] - threshold) {
+                    ++additiveSamples;
+                }
+
+                candidateSet = new int[from + additiveSamples];
+                candidateSetHarmonics = new double[candidateSet.length];
+
+                for (int i = 0; i < candidateSet.length; ++i) {
+                    candidateSet[i] = (int) h[i][1];
+                }
+
+                HarmonicCentrality.HarmonicExactComputationThread[] exactComputationThreads = new HarmonicCentrality.HarmonicExactComputationThread[this.numberOfThreads];
+                HarmonicCentrality.this.nextNode.set(0);
+
+                for (int executorService = 0; executorService < exactComputationThreads.length; ++executorService) {
+                    exactComputationThreads[executorService] = new HarmonicCentrality.HarmonicExactComputationThread();
+                }
+
+                if (this.pl != null) {
+                    this.pl.start("Starting visits...");
+                    this.pl.expectedUpdates = (long) this.graph.numNodes();
+                    this.pl.itemsName = "nodes";
+                }
+
+                var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+                executorCompletionService = new ExecutorCompletionService(var11);
+
+                e = exactComputationThreads.length;
+
+                while (e-- != 0) executorCompletionService.submit(exactComputationThreads[e]);
+
+                try {
+                    e = exactComputationThreads.length;
+
+                    while (e-- != 0) {
+                        executorCompletionService.take().get();
+                    }
+                } catch (ExecutionException var9) {
+                    this.stop = true;
+                    Throwable cause = var9.getCause();
+                    throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
+                } finally {
+                    var11.shutdown();
+                }
+            }
+        }
+        else {
+            HarmonicCentrality.BFSCutThread[] thread = new HarmonicCentrality.BFSCutThread[this.numberOfThreads];
+
+            for (int executorService = 0; executorService < thread.length; ++executorService) {
+                thread[executorService] = new HarmonicCentrality.BFSCutThread();
+            }
+
+            if (this.pl != null) {
+                this.pl.start("Starting visits...");
+                this.pl.expectedUpdates = (long) this.graph.numNodes();
+                this.pl.itemsName = "nodes";
+            }
+
+            ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+            ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
+            int e = thread.length;
+
+            while (e-- != 0) executorCompletionService.submit(thread[e]);
+
+            try {
+                e = thread.length;
+
+                while (e-- != 0) {
+                    executorCompletionService.take().get();
+                }
+            } catch (ExecutionException var9) {
+                this.stop = true;
+                Throwable cause = var9.getCause();
+                throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
             } finally {
                 var11.shutdown();
             }
@@ -441,12 +476,99 @@ public class HarmonicCentrality {
         }
     }
 
+    private final TreeSet<Double[]> borassi_list = new TreeSet<Double[]>(new Comparator<Double[]>() {
+        public int compare(Double[] o1, Double[] o2) {
+            return o2[0].compareTo(o1[0]);
+        }
+    });
+
+    private final class BFSCutThread implements Callable<Void> {
+        private final IntArrayFIFOQueue queue;
+        private final int[] distance;
+
+        private BFSCutThread() {
+            this.distance = new int[HarmonicCentrality.this.graph.numNodes()];
+            this.queue = new IntArrayFIFOQueue();
+        }
+
+        public Void call() {
+            IntArrayFIFOQueue queue = this.queue;
+            ImmutableGraph graph = HarmonicCentrality.this.graph.copy();
+
+            while (true) {
+                int curr = HarmonicCentrality.this.nextNode.getAndIncrement();
+                if (HarmonicCentrality.this.stop || curr >= graph.numNodes()) {
+                    return null;
+                }
+
+                double apx_h = 0;
+                double h = 0;
+                double gamma = 0;
+                double nd = 0;
+                queue.clear();
+                queue.enqueue(curr);
+                Arrays.fill(distance, -1);
+                int d = 0;
+
+                while (!queue.isEmpty()) {
+                    int node = queue.dequeueInt();
+                    int dist = distance[node] + 1;
+                    LazyIntIterator succ = graph.successors(node);
+                    int s;
+                    while ((s = succ.nextInt()) != -1) {
+                        if (distance[s] == -1) {
+                            queue.enqueue(s);
+                            distance[s] = dist;
+                        }
+                    }
+
+                    if (distance[node] > d) {
+                        apx_h += h + gamma / ((d + 1) * (d + 2)) + (graph.numNodes() - nd) / (d + 2);
+                        if (borassi_list.size() > k && apx_h / (graph.numNodes() - 1) <= borassi_list.first()[0]) {
+                            return null;
+                        }
+                        ++d;
+                    }
+                    if (node != curr) {
+                        h += 1 / d;
+                    }
+                    gamma += graph.outdegree(node);
+                    ++nd;
+                }
+
+                Double new_h = h / (graph.numNodes() - 1);
+                if (borassi_list.size() > 0) {
+                    Double[] last = borassi_list.last();
+                    if (last[0] < new_h) {
+                        borassi_list.remove(last);
+                        addEntry(new_h, (double)curr);
+                    }
+                }
+                else {
+                    addEntry(new_h, (double)curr);
+                }
+            }
+        }
+    }
+
+    /** Adds a new Harmonic Centrality entry to the Borassi et al. top-k candidate set.
+     *
+     * @param value the value of the harmonic centrality.
+     * @param index the id of the corresponding node.
+     */
+    private void addEntry(Double value, Double index) {
+    Double[] newEntry = new Double[2];
+    newEntry[0] = value;
+    newEntry[1] = index;
+    borassi_list.add(newEntry);
+}
+
     /** Sorts a double array by keeping track of the corresponding index. It is useful in order to not losing
      *  the association between the nodes and their harmonic centrality value.
      * @param arr the input array (contains the harmonic centrality values corresponding to each node)
      * @return a 2D array: first [harmonic_centrality_value][corresponding_node_id].
      */
-    public static double[][] sort(double[] arr) {
+    static double[][] sort(double[] arr) {
         double[][] newArr = new double[arr.length][2];
         for (int i = 0; i < arr.length; ++i) {
             newArr[i][0] = arr[i];
@@ -460,7 +582,7 @@ public class HarmonicCentrality {
      *
      * @param arr the sorted array
      */
-    public static void sort(double[][] arr) {
+    static void sort(double[][] arr) {
         Arrays.sort(arr, new Comparator<double[]>() {
             public int compare(double[] e1, double[] e2) {
                 return(Double.valueOf(e2[0]).compareTo(e1[0]));

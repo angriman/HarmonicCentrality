@@ -35,6 +35,7 @@ public class Test {
                         new Switch("expand", 'e', "expand", "Expand the graph to increase speed (no compression)."),
                         new Switch("mapped", 'm', "mapped", "Use loadMapped() to load the graph."),
                         new Switch("naive", 'n', "Use the naive algorithm to compute the exact harmonic centralities"),
+                        new Switch("borassi", 'b', "Calculates the exact top-k Harmonic Centralities using the Borassi et al. algorithm."),
                         new Switch("top_k", 'k', "Calculates the exact top-k Harmonic Centralities using the Okamoto et al. algorithm."),
                         new FlaggedOption("threads", JSAP.INTSIZE_PARSER, "0", false, 'T', "threads", "The number of threads to be used. If 0, the number will be estimated automatically."),
                         new UnflaggedOption("graphBasename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The basename of the graph."),
@@ -49,6 +50,7 @@ public class Test {
         boolean mapped = jsapResult.getBoolean("mapped", false);
         boolean top_k = jsapResult.getBoolean("top_k", false);
         boolean naive = jsapResult.getBoolean("naive", false);
+        boolean borassi = jsapResult.getBoolean("borassi", false);
         String graphBasename = "./Graphs/" + jsapResult.getString("graphBasename") + "/" + jsapResult.getString("graphBasename");
         int threads = jsapResult.getInt("threads");
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
@@ -71,7 +73,8 @@ public class Test {
 
             if (!naive) {
                 ((HarmonicCentrality)centralities).top_k = top_k;
-                checkArgs(jsapResult, (HarmonicCentrality) centralities, top_k);
+                ((HarmonicCentrality)centralities).borassi = borassi;
+                checkArgs(jsapResult, (HarmonicCentrality) centralities, top_k || borassi);
             }
 
             ThreadMXBean bean = ManagementFactory.getThreadMXBean();
