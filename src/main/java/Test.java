@@ -51,7 +51,9 @@ public class Test {
         boolean top_k = jsapResult.getBoolean("top_k", false);
         boolean naive = jsapResult.getBoolean("naive", false);
         boolean borassi = jsapResult.getBoolean("borassi", false);
+
         String graphBasename = "./Graphs/" + jsapResult.getString("graphBasename") + "/" + jsapResult.getString("graphBasename");
+
         int threads = jsapResult.getInt("threads");
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
         progressLogger.displayFreeMemory = true;
@@ -70,7 +72,6 @@ public class Test {
         centralities = naive ? new GeometricCentralities(graph, threads, progressLogger): new HarmonicCentrality(graph, threads, progressLogger);
 
         for (int k = WARMUP + REPEAT; k-- != 0; ) {
-
             if (!naive) {
                 ((HarmonicCentrality)centralities).top_k = top_k;
                 ((HarmonicCentrality)centralities).borassi = borassi;
@@ -92,7 +93,7 @@ public class Test {
                 total_visited_nodes += naive ? ((GeometricCentralities)centralities).visitedNodes() : ((HarmonicCentrality)centralities).visitedNodes();
                 total_visited_arcs += naive ? ((GeometricCentralities)centralities).visitedArcs() : ((HarmonicCentrality)centralities).visitedArcs();
                 if (!naive) {
-                    System.out.println("Random samples = " + ((HarmonicCentrality)centralities).randomSamples());
+                    if(!borassi) System.out.println("Random samples = " + ((HarmonicCentrality)centralities).randomSamples());
                     if (!top_k) {
                         double[] exact = BinIO.loadDoubles(jsapResult.getString("harmonicFilename"));
                         int i = 0;
@@ -143,7 +144,6 @@ public class Test {
             }
         }
         else {
-
             System.err.println((top_k ? "k" : "precision") + " not specified");
             System.exit(1);
         }

@@ -18,22 +18,19 @@ import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import it.unimi.dsi.webgraph.Transform;
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Implements the Eppstein et al. and Okamoto et al. algorithms for the efficient randomized computation of the Harmonic
- * Centrality. The Eppstein algorithm can be used by specifying the precision at the end of the command line while the
- * Okamoto algorithm needs the option -k to be activated and the k specified at the end of the line.
+/** Implements the Eppstein et al., Okamoto et al. and Borassi et al. algorithms for the efficient randomized
+ * computation of the Harmonic Centrality. The Eppstein algorithm can be used by specifying the precision at
+ * the end of the command line, the Okamoto and the Borassi algorithms need the option -k or -b to be activated
+ * and the k specified at the end of the line.
  */
-
 public class HarmonicCentrality {
     private static final Logger LOGGER = LoggerFactory.getLogger(HarmonicCentrality.class);
 
@@ -58,7 +55,7 @@ public class HarmonicCentrality {
     /** Whether or not to compute the exact top-k harmonic centralities using the Okamoto algorithm. */
     boolean top_k = false;
     /** Whether or not to compute the exact top-k harmonic centralities using the Borassi et al. algorithm. */
-    boolean borassi = false;
+    boolean borassi = true;
     /** Number of top-k centralities to compute using the Okamoto algorithm. */
     int k = 0;
     /** Candidate set vector for the Okamoto algorithm. */
@@ -335,6 +332,7 @@ public class HarmonicCentrality {
         progressLogger.displayFreeMemory = true;
         progressLogger.displayLocalSpeed = true;
         ImmutableGraph graph = mapped?ImmutableGraph.loadMapped(graphBasename, progressLogger):ImmutableGraph.load(graphBasename, progressLogger);
+        graph = Transform.symmetrize(graph);
         if(jsapResult.userSpecified("expand")) {
             graph = (new ArrayListMutableGraph(graph)).immutableView();
         }
@@ -342,7 +340,6 @@ public class HarmonicCentrality {
         HarmonicCentrality centralities = new HarmonicCentrality(graph, threads, progressLogger);
         centralities.top_k = top_k;
         String prec_k = jsapResult.getString("precision/k");
-
         if (prec_k != null) {
             if (top_k) {
                 centralities.k = Integer.parseInt(prec_k);
@@ -363,6 +360,7 @@ public class HarmonicCentrality {
             System.exit(1);
         }
         centralities.compute();
+        System.out.println("Greatest centrality = " + centralities.borassi_list.first()[0] + "; index = " + centralities.borassi_list.first()[1]);
     }
 
     /** Thread for the estimation of the harmonic centrality of a single node using the Eppstein algorithm.
@@ -476,11 +474,20 @@ public class HarmonicCentrality {
         }
     }
 
-    private final TreeSet<Double[]> borassi_list = new TreeSet<Double[]>(new Comparator<Double[]>() {
+    private ConcurrentSkipListSet<Double[]> borassi_list = new ConcurrentSkipListSet<Double[]>(new Comparator<Double[]>() {
         public int compare(Double[] o1, Double[] o2) {
+            if (o1[0].equals(o2[0])) {
+                return o1[1].compareTo(o2[1]);
+            }
             return o2[0].compareTo(o1[0]);
         }
     });
+
+//    private TreeSet<Double[]> borassi_list = new TreeSet<Double[]>(new Comparator<Double[]>() {
+//        public int compare(Double[] o1, Double[] o2) {
+//            return o2[0].compareTo(o1[0]);
+//        }
+//    });
 
     private final class BFSCutThread implements Callable<Void> {
         private final IntArrayFIFOQueue queue;
@@ -501,67 +508,77 @@ public class HarmonicCentrality {
                     return null;
                 }
 
-                double apx_h = 0;
-                double h = 0;
-                double gamma = 0;
-                double nd = 0;
+                boolean DEBUG = (curr == 2);
+                double apx_h = 0, h = 0, gamma = 0, nd = 0, d = 0;
                 queue.clear();
                 queue.enqueue(curr);
                 Arrays.fill(distance, -1);
-                int d = 0;
+                distance[curr] = 0;
+                //if (DEBUG) System.out.println("Examining node " + curr + " ...");
 
                 while (!queue.isEmpty()) {
                     int node = queue.dequeueInt();
-                    int dist = distance[node] + 1;
+                    int dist = distance[node];
                     LazyIntIterator succ = graph.successors(node);
                     int s;
                     while ((s = succ.nextInt()) != -1) {
+                        visitedArcs.getAndIncrement();
                         if (distance[s] == -1) {
                             queue.enqueue(s);
-                            distance[s] = dist;
+                            distance[s] = dist + 1;
+                            visitedNodes.getAndIncrement();
+                            //if (DEBUG) System.out.println("Distance from " + curr + " to " + s + " = " + (dist+1));
                         }
                     }
 
                     if (distance[node] > d) {
-                        apx_h += h + gamma / ((d + 1) * (d + 2)) + (graph.numNodes() - nd) / (d + 2);
-                        if (borassi_list.size() > k && apx_h / (graph.numNodes() - 1) <= borassi_list.first()[0]) {
+                        apx_h += h + gamma / ((d + 1D) * (d + 2D)) + (graph.numNodes() - nd) / (d + 2D);
+                        if (borassi_list.size() == k && apx_h / (double)(graph.numNodes() - 1) <= borassi_list.last()[0]) {
+                            System.out.println("Cut");
                             return null;
                         }
-                        ++d;
+                        d += 1.0;
                     }
+
                     if (node != curr) {
-                        h += 1 / d;
+                        h += 1 / (double)dist;
+                        //if (DEBUG) System.out.println(h + " " + dist);
+
                     }
                     gamma += graph.outdegree(node);
-                    ++nd;
+                    nd += 1.0;
                 }
+                Double new_h = h / (double)(graph.numNodes() - 1);
+                addEntry(new_h, (double)curr);
 
-                Double new_h = h / (graph.numNodes() - 1);
-                if (borassi_list.size() > 0) {
-                    Double[] last = borassi_list.last();
-                    if (last[0] < new_h) {
-                        borassi_list.remove(last);
-                        addEntry(new_h, (double)curr);
-                    }
-                }
-                else {
-                    addEntry(new_h, (double)curr);
-                }
             }
         }
     }
 
     /** Adds a new Harmonic Centrality entry to the Borassi et al. top-k candidate set.
-     *
+     *  If the list contains less than k elements it adds the new entry immediately. Otherwise it checks if the
+     *  new entry is greater than or equal the k-th harmonic centrality. If yes the k-th centrality is removed
+     *  from the list and the new entry is added, otherwise the new entry is discarded.
      * @param value the value of the harmonic centrality.
      * @param index the id of the corresponding node.
      */
-    private void addEntry(Double value, Double index) {
-    Double[] newEntry = new Double[2];
-    newEntry[0] = value;
-    newEntry[1] = index;
-    borassi_list.add(newEntry);
-}
+    private synchronized void addEntry(Double value, Double index) {
+        if (borassi_list.size() == k) {
+            Double[] last = borassi_list.last();
+            if (last[0] > value) {
+                return;
+            }
+            borassi_list.remove(last);
+            //System.out.println("removing " + last[0] + " new min = " + Math.min(value, borassi_list.last()[0]));
+        }
+
+        Double[] newEntry = new Double[2];
+        newEntry[0] = value;
+        newEntry[1] = index;
+        //System.out.println(index + " " + value);
+        borassi_list.add(newEntry);
+       // System.out.println(borassi_list.size());
+    }
 
     /** Sorts a double array by keeping track of the corresponding index. It is useful in order to not losing
      *  the association between the nodes and their harmonic centrality value.

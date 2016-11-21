@@ -19,8 +19,8 @@
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="HarmonicCentrality_main" target="1.5" />
-      <module name="HarmonicCentrality_test" target="1.5" />
+      <module name="HarmonicCentrality_main" target="1.6" />
+      <module name="HarmonicCentrality_test" target="1.6" />
     </bytecodeTargetLevel>
   </component>
 </project>

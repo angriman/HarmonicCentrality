@@ -134,7 +134,7 @@ public class GeometricCentralities {
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
         progressLogger.displayFreeMemory = true;
         progressLogger.displayLocalSpeed = true;
-        ImmutableGraph graph = mapped?ImmutableGraph.loadMapped(graphBasename, progressLogger):ImmutableGraph.load(graphBasename, progressLogger);
+        ImmutableGraph graph = mapped ? ImmutableGraph.loadMapped(graphBasename, progressLogger):ImmutableGraph.load(graphBasename, progressLogger);
         if(jsapResult.userSpecified("expand")) {
             graph = (new ArrayListMutableGraph(graph)).immutableView();
         }
