@@ -11,6 +11,8 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="HarmonicCentrality_main" />
     <orderEntry type="library" name="Gradle: it.unimi.dsi:webgraph:3.5.2" level="project" />
+    <orderEntry type="library" name="Gradle: org.json:json:20160810" level="project" />
+    <orderEntry type="library" name="Gradle: it.unipd.dei:experiment-reporter:0.3.0" level="project" />
     <orderEntry type="library" name="Gradle: junit:junit:4.11" level="project" />
     <orderEntry type="library" name="Gradle: it.unimi.dsi:fastutil:7.0.12" level="project" />
     <orderEntry type="library" name="Gradle: it.unimi.dsi:sux4j:4.0.0" level="project" />
@@ -20,6 +22,8 @@
     <orderEntry type="library" name="Gradle: com.martiansoftware:jsap:2.1" level="project" />
     <orderEntry type="library" name="Gradle: ch.qos.logback:logback-classic:1.1.7" level="project" />
     <orderEntry type="library" name="Gradle: org.apache.commons:commons-lang3:3.4" level="project" />
+    <orderEntry type="library" name="Gradle: com.google.code.gson:gson:2.3" level="project" />
+    <orderEntry type="library" name="Gradle: joda-time:joda-time:2.5" level="project" />
     <orderEntry type="library" name="Gradle: org.hamcrest:hamcrest-core:1.3" level="project" />
     <orderEntry type="library" name="Gradle: commons-io:commons-io:2.4" level="project" />
     <orderEntry type="library" name="Gradle: commons-lang:commons-lang:2.6" level="project" />

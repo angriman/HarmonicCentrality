@@ -22,7 +22,9 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import it.unimi.dsi.webgraph.Transform;
+import it.unipd.dei.experiment.Experiment;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.math3.analysis.function.Exp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -168,6 +170,11 @@ public class HarmonicCentrality {
         return ArrayUtils.toPrimitive(set.toArray(new Integer[set.size()]));
     }
 
+    void setPrecision(double precision) {
+        this.precision = precision;
+        randomSamples = pickRandomSamples(numberOfSamples());
+    }
+
     /** f(l) function used by the Okamoto algorithm.
      *
      * @return the threshold to be used to calculate the candidate set.
@@ -177,12 +184,10 @@ public class HarmonicCentrality {
     }
 
     /** Computes the harmonic centralities using the required algorithm.
-     *
-     * @throws InterruptedException
      */
     void compute() throws InterruptedException {
         if (!borassi) {
-            randomSamples = pickRandomSamples(numberOfSamples());
+
             normalization = (double) graph.numNodes() / ((double) (graph.numNodes() - 1) * (double) randomSamples.length);
             HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
 
@@ -483,12 +488,6 @@ public class HarmonicCentrality {
         }
     });
 
-//    private TreeSet<Double[]> borassi_list = new TreeSet<Double[]>(new Comparator<Double[]>() {
-//        public int compare(Double[] o1, Double[] o2) {
-//            return o2[0].compareTo(o1[0]);
-//        }
-//    });
-
     private final class BFSCutThread implements Callable<Void> {
         private final IntArrayFIFOQueue queue;
         private final int[] distance;
@@ -532,9 +531,11 @@ public class HarmonicCentrality {
                     }
 
                     if (distance[node] > d) {
-                        apx_h += h + gamma / ((d + 1D) * (d + 2D)) + (graph.numNodes() - nd) / (d + 2D);
+                        apx_h = h + gamma / ((d + 1D) * (d + 2D)) + ((double)graph.numNodes() - nd) / (d + 2D);
+                        //if (borassi_list.size() == k) System.out.println(apx_h / (double)(graph.numNodes() - 1) + " <= " + borassi_list.last()[0]);
+
                         if (borassi_list.size() == k && apx_h / (double)(graph.numNodes() - 1) <= borassi_list.last()[0]) {
-                            System.out.println("Cut");
+                            //System.out.println("Cut");
                             return null;
                         }
                         d += 1.0;
@@ -551,6 +552,11 @@ public class HarmonicCentrality {
                 Double new_h = h / (double)(graph.numNodes() - 1);
                 addEntry(new_h, (double)curr);
 
+                if (HarmonicCentrality.this.pl != null) {
+                    synchronized (HarmonicCentrality.this.pl) {
+                        HarmonicCentrality.this.pl.update();
+                    }
+                }
             }
         }
     }
