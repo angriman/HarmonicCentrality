@@ -11,13 +11,14 @@ import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.Transform;
 import it.unimi.dsi.webgraph.algo.HyperBall;
 import it.unipd.dei.experiment.Experiment;
-import org.json.JSONObject;
+import it.unipd.dei.experiment.JsonFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.io.IOException;
-import java.io.PrintWriter;
+
+import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
+import java.util.Scanner;
 
 /** Implements a test to measure the algorithms performances in terms of time and precision.
  *
@@ -40,9 +41,9 @@ public class Test {
                         new Switch("okamoto", 'o', "Calculates the exact top-k Harmonic Centralities using the Okamoto et al. algorithm."),
                         new Switch("hyperball", 'h', "Runs HyperANF."),
                         new FlaggedOption("threads", JSAP.INTSIZE_PARSER, "0", false, 'T', "threads", "The number of threads to be used. If 0, the number will be estimated automatically."),
-                        new UnflaggedOption("graphBasename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The basename of the graph."),
+                        //new UnflaggedOption("graphBasename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The basename of the graph."),
                         //new UnflaggedOption("harmonicFilename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The filename where harmonic centrality scores (doubles in binary form) will be stored."),
-                        new UnflaggedOption("precision/k", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, false, false, "The precision for the Eppstein algorithm or k for Okamoto")
+                        //new UnflaggedOption("precision/k", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, false, false, "The precision for the Eppstein algorithm or k for Okamoto")
                 });
         JSAPResult jsapResult = jsap.parse(args);
         if (jsap.messagePrinted()) {
@@ -55,10 +56,6 @@ public class Test {
         boolean borassi = jsapResult.getBoolean("borassi", false);
         boolean hyperball = jsapResult.getBoolean("hyperball", false);
 
-        /* Path where the graph is stored. */
-        String graphBasename = "./Graphs/" + jsapResult.getString("graphBasename") + "/" + jsapResult.getString("graphBasename");
-        /* Path where the exact value of the Harmonic centralities is (or should be if not already computed) stored. */
-        String harmonicsFileName = graphBasename + "_ground_truth.txt";
         /* Number of threads. */
         int threads = jsapResult.getInt("threads");
 
@@ -66,78 +63,111 @@ public class Test {
         progressLogger.displayFreeMemory = true;
         progressLogger.displayLocalSpeed = true;
 
-        /* Reads the input graph. */
-        ImmutableGraph graph = mapped ? ImmutableGraph.loadMapped(graphBasename, progressLogger) : ImmutableGraph.load(graphBasename, progressLogger);
-        /* Transforms the graph to an undirected graph. */
-        graph = Transform.symmetrize(graph);
-
-        if (jsapResult.userSpecified("expand")) {
-            graph = (new ArrayListMutableGraph(graph)).immutableView();
-        }
-
-        /* Performance metrics for all algorithms. */
-        long total_time = 0;
-        long total_visited_nodes = 0;
-        long total_visited_arcs = 0;
-
 
         /* Generalized class. */
         Object centralities;
 
-        /* Set up experimental metrics. */
-        Experiment experiment = new Experiment();
-        experiment.tag("Graph name", jsapResult.getString("graphBasename"));
+        /* Graphs on which perform the experiment. */
+        File graphList = new File("GraphList.txt");
+        Scanner scanner = new Scanner(graphList);
 
         /* Experiments begins here */
-        for (int k = WARMUP + REPEAT; k-- != 0; ) {
-            ThreadMXBean bean = ManagementFactory.getThreadMXBean();
-            long time;
-            int isWarmup = (k < REPEAT) ? 1 : 0;
+        while (scanner.hasNextLine()) {
 
-            if (naive) {
-                centralities = new GeometricCentralities(graph, threads, progressLogger);
-                time = bean.getCurrentThreadCpuTime();
-                ((GeometricCentralities)centralities).compute();
-                time = bean.getCurrentThreadCpuTime() - time;
-                if (k == REPEAT - 1) {
-                    BinIO.storeDoubles(((GeometricCentralities)centralities).harmonic, harmonicsFileName);
+            String currentGraph = scanner.nextLine();
+
+            /* Set up experimental metrics. */
+            Experiment experiment = new Experiment();
+
+            final String algoString = "Algorithm";
+            if (naive) experiment.tag(algoString, "Naive");
+            else if (okamoto) experiment.tag(algoString, "Okamoto");
+            else if (borassi) experiment.tag(algoString, "Borassi");
+            else if (hyperball) experiment.tag(algoString, "HyperANF");
+            else experiment.tag(algoString , "Eppstein");
+
+            final String timingTableName = "Timing";
+
+            /* Path where the graph is stored. */
+            final String graphBasename = "./Graphs/" + currentGraph + "/" + currentGraph; //jsapResult.getString("graphBasename");
+
+            /* Reads the input graph. */
+            ImmutableGraph graph = mapped ? ImmutableGraph.loadMapped(graphBasename, progressLogger) : ImmutableGraph.load(graphBasename, progressLogger);
+
+            experiment
+                    .tag("Graph Name", currentGraph)
+                    .tag("Num. nodes", graph.numNodes())
+                    .tag("Num. arcs", graph.numArcs());
+
+            /* Transforms the graph to an undirected graph. */
+            graph = Transform.symmetrize(graph);
+
+            if (jsapResult.userSpecified("expand")) {
+                graph = (new ArrayListMutableGraph(graph)).immutableView();
+            }
+
+
+            for (int k = WARMUP + REPEAT; k-- != 0; ) {
+                ThreadMXBean bean = ManagementFactory.getThreadMXBean();
+                long time;
+                long visited_nodes = 0;
+                long visited_arcs = 0;
+                boolean isWarmup = k < REPEAT;
+
+                if (naive) {
+                    centralities = new GeometricCentralities(graph, threads, progressLogger);
+                    time = bean.getCurrentThreadCpuTime();
+                    ((GeometricCentralities)centralities).compute();
+                    time = bean.getCurrentThreadCpuTime() - time;
+//                    if (k == REPEAT - 1) {
+//                        BinIO.storeDoubles(((GeometricCentralities)centralities).harmonic, harmonicsFileName);
+//                    }
+                    visited_arcs = ((GeometricCentralities)centralities).visitedArcs();
+                    visited_nodes = ((GeometricCentralities)centralities).visitedNodes();
                 }
-                total_visited_arcs += isWarmup * ((GeometricCentralities)centralities).visitedArcs();
-                total_visited_nodes += isWarmup * ((GeometricCentralities)centralities).visitedNodes();
-            }
-            else if (hyperball) {
-                centralities = new HyperBall(graph, 7);
-                time = bean.getCurrentThreadCpuTime();
-                ((HyperBall)centralities).run();
-                time = bean.getCurrentThreadCpuTime() - time;
-            }
-            else {
-                centralities = new HarmonicCentrality(graph, threads, progressLogger);
-                ((HarmonicCentrality)centralities).top_k = okamoto;
-                ((HarmonicCentrality)centralities).borassi = borassi;
-                checkArgs(jsapResult, (HarmonicCentrality) centralities, okamoto || borassi);
-                time = bean.getCurrentThreadCpuTime();
-                ((HarmonicCentrality)centralities).compute();
-                time = bean.getCurrentThreadCpuTime() - time;
-                total_visited_arcs += isWarmup * ((HarmonicCentrality)centralities).visitedArcs();
-                total_visited_nodes += isWarmup * ((HarmonicCentrality)centralities).visitedNodes();
+                else if (hyperball) {
+                    centralities = new HyperBall(graph, 7);
+                    time = bean.getCurrentThreadCpuTime();
+                    ((HyperBall)centralities).run();
+                    time = bean.getCurrentThreadCpuTime() - time;
+                }
+                else {
+                    centralities = new HarmonicCentrality(graph, threads, progressLogger);
+                    ((HarmonicCentrality)centralities).top_k = okamoto;
+                    ((HarmonicCentrality)centralities).borassi = borassi;
+                    checkArgs(jsapResult, (HarmonicCentrality) centralities, okamoto || borassi);
+                    time = bean.getCurrentThreadCpuTime();
+                    ((HarmonicCentrality)centralities).compute();
+                    time = bean.getCurrentThreadCpuTime() - time;
+                    visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
+                    visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
+                }
+
+                if (isWarmup) {
+                    experiment.append(timingTableName,
+                            "Iteration", (REPEAT - k),
+                            "CPU Time", time,
+                            "Visited nodes", visited_nodes,
+                            "Visited arcs", visited_arcs);
+                    if (k == REPEAT - 1 && naive) {
+                        double[] harmonics = ((GeometricCentralities) centralities).harmonic;
+                        for (int c = 0; c < harmonics.length; ++c) {
+                            experiment.append("Centralities", "Node", c, "Value", harmonics[c]);
+                        }
+
+                    }
+                }
             }
 
-            total_time += isWarmup * time;
+            File outFile = new File("./results/" + currentGraph + ".json");
+            OutputStream os = new FileOutputStream(outFile);
+            PrintWriter out = new PrintWriter(os);
+            out.write(JsonFormatter.format(experiment));
+            out.close();
+
         }
 
-        final double averageTime = total_time / (double)REPEAT;
-        System.out.println("Num nodes = " + graph.numNodes());
-        System.out.println("Num arcs = " + graph.numArcs());
-        System.out.printf("Time: %.3fms\nVisited nodes: %d\nVisited arcs: %d\n", averageTime / 1E6, total_visited_nodes / REPEAT, total_visited_arcs / REPEAT);
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("nodes", new Integer((int)(total_visited_nodes / REPEAT)));
-        jsonObject.put("arcs", new Integer((int)(total_visited_arcs / REPEAT)));
-        jsonObject.put("time", new Double(averageTime));
 
-        PrintWriter out = new PrintWriter("./results/" + jsapResult.getString("graphBasename") + ".json");
-        out.println(jsonObject.toString());
-        out.close();
 
 //        /* Experiments begins here */
 //        for (int k = WARMUP + REPEAT; k-- != 0; ) {

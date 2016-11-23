@@ -3,30 +3,24 @@
 // (powered by Fernflower decompiler)
 //
 
-import com.martiansoftware.jsap.FlaggedOption;
-import com.martiansoftware.jsap.JSAP;
-import com.martiansoftware.jsap.JSAPException;
-import com.martiansoftware.jsap.JSAPResult;
-import com.martiansoftware.jsap.Parameter;
-import com.martiansoftware.jsap.SimpleJSAP;
-import com.martiansoftware.jsap.Switch;
-import com.martiansoftware.jsap.UnflaggedOption;
+import com.martiansoftware.jsap.*;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
-import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import it.unimi.dsi.webgraph.Transform;
-import it.unipd.dei.experiment.Experiment;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.math3.analysis.function.Exp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Random;
+import java.util.TreeSet;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Implements the Eppstein et al., Okamoto et al. and Borassi et al. algorithms for the efficient randomized
  * computation of the Harmonic Centrality. The Eppstein algorithm can be used by specifying the precision at
@@ -312,6 +306,110 @@ public class HarmonicCentrality {
         }
     }
 
+    public void computeEppstein() throws InterruptedException {
+        normalization = (double) graph.numNodes() / ((double) (graph.numNodes() - 1) * (double) randomSamples.length);
+        HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
+
+        for (int executorService = 0; executorService < thread.length; ++executorService) {
+            thread[executorService] = new HarmonicCentrality.HarmonicApproximationThread();
+        }
+
+        if (this.pl != null) {
+            this.pl.start("Starting visits...");
+            this.pl.expectedUpdates = (long) this.graph.numNodes();
+            this.pl.itemsName = "nodes";
+        }
+
+        ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
+        int e = thread.length;
+
+        while (e-- != 0) executorCompletionService.submit(thread[e]);
+
+        try {
+            e = thread.length;
+
+            while (e-- != 0) {
+                executorCompletionService.take().get();
+            }
+        } catch (ExecutionException var9) {
+            this.stop = true;
+            Throwable cause = var9.getCause();
+            throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
+        } finally {
+            var11.shutdown();
+        }
+
+        if (!top_k && this.pl != null) {
+            this.pl.done();
+        }
+    }
+
+    public void computeOkamoto() throws InterruptedException {
+        HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
+        for (int executorService = 0; executorService < thread.length; ++executorService) {
+            thread[executorService] = new HarmonicCentrality.HarmonicApproximationThread();
+        }
+        if (this.pl != null) {
+            this.pl.start("Starting visits...");
+            this.pl.expectedUpdates = (long) this.graph.numNodes();
+            this.pl.itemsName = "nodes";
+        }
+        ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
+
+        int e = thread.length;
+        double[][] h = sort(harmonic);
+
+        int from = k - 1;
+        int additiveSamples = 0;
+        double threshold = f_function();
+        while (from + additiveSamples < graph.numNodes() && h[from + additiveSamples][0] >= h[from][0] - threshold) {
+            ++additiveSamples;
+        }
+
+        candidateSet = new int[from + additiveSamples];
+        candidateSetHarmonics = new double[candidateSet.length];
+
+        for (int i = 0; i < candidateSet.length; ++i) {
+            candidateSet[i] = (int) h[i][1];
+        }
+
+        HarmonicCentrality.HarmonicExactComputationThread[] exactComputationThreads = new HarmonicCentrality.HarmonicExactComputationThread[this.numberOfThreads];
+        HarmonicCentrality.this.nextNode.set(0);
+
+        for (int executorService = 0; executorService < exactComputationThreads.length; ++executorService) {
+            exactComputationThreads[executorService] = new HarmonicCentrality.HarmonicExactComputationThread();
+        }
+
+        if (this.pl != null) {
+            this.pl.start("Starting visits...");
+            this.pl.expectedUpdates = (long) this.graph.numNodes();
+            this.pl.itemsName = "nodes";
+        }
+
+        var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        executorCompletionService = new ExecutorCompletionService(var11);
+
+        e = exactComputationThreads.length;
+
+        while (e-- != 0) executorCompletionService.submit(exactComputationThreads[e]);
+
+        try {
+            e = exactComputationThreads.length;
+
+            while (e-- != 0) {
+                executorCompletionService.take().get();
+            }
+        } catch (ExecutionException var9) {
+            this.stop = true;
+            Throwable cause = var9.getCause();
+            throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
+        } finally {
+            var11.shutdown();
+        }
+    }
+
     public static void main(String[] arg) throws IOException, JSAPException, InterruptedException {
         SimpleJSAP jsap = new SimpleJSAP(HarmonicCentrality.class.getName(), "Computes positive centralities of a graph using multiple parallel breadth-first visits.\n\nPlease note that to compute negative centralities on directed graphs (which is usually what you want) you have to compute positive centralities on the transpose.",
                 new Parameter[]{
@@ -364,8 +462,8 @@ public class HarmonicCentrality {
             System.err.println((top_k ? "k" : "precision") + " not specified");
             System.exit(1);
         }
-        centralities.compute();
-        System.out.println("Greatest centrality = " + centralities.borassi_list.first()[0] + "; index = " + centralities.borassi_list.first()[1]);
+        //centralities.compute();
+        //System.out.println("Greatest centrality = " + centralities.borassi_list.first()[0] + "; index = " + centralities.borassi_list.first()[1]);
     }
 
     /** Thread for the estimation of the harmonic centrality of a single node using the Eppstein algorithm.

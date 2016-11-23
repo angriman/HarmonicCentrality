@@ -1,6 +1,7 @@
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Scanner;
 
@@ -13,9 +14,15 @@ import java.util.Scanner;
  */
 public class Evaluate {
     public static void main(String[] args) throws IOException {
-        File inputFile = new File("./results.json");
-        Scanner input = new Scanner(inputFile);
-        JSONObject reader = new JSONObject(input.nextLine());
-        System.out.println("NODES: " + reader.getInt("nodes") + "\nARCS: " + reader.getInt("arcs") + "\nTIME: " + reader.getDouble("time"));
+        try {
+            File inputFile = new File("./results/dummygraph.json");
+            Scanner input = new Scanner(inputFile);
+            JSONObject reader = new JSONObject(input.nextLine());
+            JSONObject tags = reader.getJSONObject("tags");
+            System.out.println(tags.getInt("Num. arcs"));
+        }
+        catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
     }
 }
