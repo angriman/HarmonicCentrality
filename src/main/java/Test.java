@@ -27,9 +27,18 @@ public class Test {
     /** Progress logger */
     private static final Logger LOGGER = LoggerFactory.getLogger(HarmonicCentrality.class);
     /** Number of warm-up iterations */
-    private final static int WARMUP = 1;
+    private final static int WARMUP = 0;
     /** Number of repetition runs */
-    private final static int REPEAT = 2;
+    private final static int REPEAT = 5;
+
+    private static boolean naive = false;
+    private static boolean okamoto = false;
+    private static boolean borassi = false;
+    private static boolean hyperball = false;
+    private static int topk = 1;
+    private static double precision = 0.1;
+
+
 
     public static void main(String[] args) throws IOException, JSAPException, InterruptedException {
         SimpleJSAP jsap = new SimpleJSAP(HarmonicCentrality.class.getName(), "Computes positive centralities of a graph using multiple parallel breadth-first visits.\n\nPlease note that to compute negative centralities on directed graphs (which is usually what you want) you have to compute positive centralities on the transpose.",
@@ -43,7 +52,7 @@ public class Test {
                         new FlaggedOption("threads", JSAP.INTSIZE_PARSER, "0", false, 'T', "threads", "The number of threads to be used. If 0, the number will be estimated automatically."),
                         //new UnflaggedOption("graphBasename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The basename of the graph."),
                         //new UnflaggedOption("harmonicFilename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The filename where harmonic centrality scores (doubles in binary form) will be stored."),
-                        //new UnflaggedOption("precision/k", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, false, false, "The precision for the Eppstein algorithm or k for Okamoto")
+                        new UnflaggedOption("precision/k", JSAP.DOUBLE_PARSER, JSAP.NO_DEFAULT, false, false, "The precision for the Eppstein algorithm.")
                 });
         JSAPResult jsapResult = jsap.parse(args);
         if (jsap.messagePrinted()) {
@@ -51,13 +60,23 @@ public class Test {
         }
 
         boolean mapped = jsapResult.getBoolean("mapped", false);
-        boolean okamoto = jsapResult.getBoolean("okamoto", false);
-        boolean naive = jsapResult.getBoolean("naive", false);
-        boolean borassi = jsapResult.getBoolean("borassi", false);
-        boolean hyperball = jsapResult.getBoolean("hyperball", false);
+        okamoto = jsapResult.getBoolean("okamoto", false);
+        naive = jsapResult.getBoolean("naive", false);
+        borassi = jsapResult.getBoolean("borassi", false);
+        hyperball = jsapResult.getBoolean("hyperball", false);
+        boolean eppstein = !okamoto && !naive && !borassi && !hyperball;
 
         /* Number of threads. */
         int threads = jsapResult.getInt("threads");
+
+        if (borassi || okamoto) {
+            topk = jsapResult.getInt("precision/k");
+        }
+        else if (!naive && !hyperball) {
+            precision = jsapResult.getDouble("precision/k");
+        }
+
+        checkArgs();
 
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
         progressLogger.displayFreeMemory = true;
@@ -81,10 +100,19 @@ public class Test {
 
             final String algoString = "Algorithm";
             if (naive) experiment.tag(algoString, "Naive");
-            else if (okamoto) experiment.tag(algoString, "Okamoto");
-            else if (borassi) experiment.tag(algoString, "Borassi");
+            else if (okamoto) {
+                experiment.tag(algoString, "Okamoto");
+                experiment.tag("k", topk);
+            }
+            else if (borassi) {
+                experiment.tag(algoString, "Borassi");
+                experiment.tag("k", topk);
+            }
             else if (hyperball) experiment.tag(algoString, "HyperANF");
-            else experiment.tag(algoString , "Eppstein");
+            else {
+                experiment.tag(algoString , "Eppstein");
+                experiment.tag("Precision", precision);
+            }
 
             final String timingTableName = "Timing";
 
@@ -109,7 +137,7 @@ public class Test {
 
             for (int k = WARMUP + REPEAT; k-- != 0; ) {
                 ThreadMXBean bean = ManagementFactory.getThreadMXBean();
-                long time;
+                long time = 0;
                 long visited_nodes = 0;
                 long visited_arcs = 0;
                 boolean isWarmup = k < REPEAT;
@@ -131,21 +159,41 @@ public class Test {
                     ((HyperBall)centralities).run();
                     time = bean.getCurrentThreadCpuTime() - time;
                 }
+                else if (borassi) {
+                    centralities = new HarmonicCentrality(graph, threads, progressLogger);
+                    ((HarmonicCentrality) centralities).k = topk;
+                    ((HarmonicCentrality) centralities).setPrecision(-1);
+                    time = bean.getCurrentThreadCpuTime();
+                    ((HarmonicCentrality) centralities).computeBorassi();
+                    time = bean.getCurrentThreadCpuTime() - time;
+                    visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
+                    visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
+                }
+                else if(okamoto) {
+                    centralities = new HarmonicCentrality(graph, threads, progressLogger);
+                    ((HarmonicCentrality)centralities).k = topk;
+                    ((HarmonicCentrality)centralities).setPrecision(-1);
+                    time = bean.getCurrentThreadCpuTime();
+                    ((HarmonicCentrality)centralities).computeOkamoto();
+                    time = bean.getCurrentThreadCpuTime() - time;
+                    visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
+                    visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
+                }
                 else {
                     centralities = new HarmonicCentrality(graph, threads, progressLogger);
-                    ((HarmonicCentrality)centralities).top_k = okamoto;
-                    ((HarmonicCentrality)centralities).borassi = borassi;
-                    checkArgs(jsapResult, (HarmonicCentrality) centralities, okamoto || borassi);
+                    ((HarmonicCentrality)centralities).setPrecision(precision);
                     time = bean.getCurrentThreadCpuTime();
-                    ((HarmonicCentrality)centralities).compute();
+                    ((HarmonicCentrality)centralities).computeEppstein();
                     time = bean.getCurrentThreadCpuTime() - time;
                     visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
                     visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
                 }
 
+                int iteration = REPEAT - k;
+
                 if (isWarmup) {
                     experiment.append(timingTableName,
-                            "Iteration", (REPEAT - k),
+                            "Iteration", iteration,
                             "CPU Time", time,
                             "Visited nodes", visited_nodes,
                             "Visited arcs", visited_arcs);
@@ -154,80 +202,54 @@ public class Test {
                         for (int c = 0; c < harmonics.length; ++c) {
                             experiment.append("Centralities", "Node", c, "Value", harmonics[c]);
                         }
+                    }
+                    else if (borassi) {
 
                     }
+                    else if (okamoto) {
+
+                    }
+                    else if (hyperball) {
+
+                    }
+                    else { // Eppstein
+                        double[] harmonics  = ((HarmonicCentrality)centralities).harmonic;
+                        for (int c = 0; c < harmonics.length; ++c) {
+                            experiment.append("Centralities" + iteration, "Node", c, "Value", harmonics[c]);
+                        }
+                    }
                 }
+
+            }
+            File outFile;
+            String filename = "./results/" + currentGraph;
+            if (borassi) {
+                filename += "_borassi_" + topk;
+            }
+            else if (eppstein) {
+                filename += "_eppstein_" + precision;
+            }
+            else if (okamoto) {
+                filename += "_okamoto_" + topk;
             }
 
-            File outFile = new File("./results/" + currentGraph + ".json");
+            filename += ".json";
+
+            outFile = new File(filename);
             OutputStream os = new FileOutputStream(outFile);
             PrintWriter out = new PrintWriter(os);
             out.write(JsonFormatter.format(experiment));
             out.close();
-
         }
-
-
-
-//        /* Experiments begins here */
-//        for (int k = WARMUP + REPEAT; k-- != 0; ) {
-//
-//
-//                if (!naive) {
-//                    if(!borassi) System.out.println("Random samples = " + ((HarmonicCentrality)centralities).randomSamples());
-//                    if (!okamoto) {
-//                      //  double[] exact = BinIO.loadDoubles(jsapResult.getString("harmonicFilename"));
-//                      //  int i = 0;
-//                      //  for (double ignored : exact) {
-////                        }
-//
-//                      //  System.out.println(Arrays.toString(errors(exact, ((HarmonicCentrality) centralities).harmonic)));
-//                    } else {
-//                        System.out.println("Additive samples = " + ((HarmonicCentrality)centralities).additiveSamples());
-//                        System.out.println(checkTopK(((HarmonicCentrality) centralities).candidateSetHarmonics, ((HarmonicCentrality)centralities).candidateSet, jsapResult) ?
-//                                "Correct" : "Incorrect");
-//                    }
-//                }
-//            }
-//        }
-
-
     }
 
-    /**
-     * Checks whether or not the command is well-formatted (i.e. if all parameters are included and of
-     * they are in the right interval)
-     * @param jsapResult    object that deals with the input parameter string
-     * @param centralities  instance of the HarmonicCentrality class
-     * @param top_k         tells if the class should compute the exact top-k harmonic centralities using
-     *                      the Okamoto et al. algorithm (= true) or if it should use the Eppstein algorithm
-     *                      to compute an estimation of the centrality of all the nodes.
-     */
-    private static void checkArgs(JSAPResult jsapResult, HarmonicCentrality centralities, boolean top_k) {
-        String prec_k = jsapResult.getString("precision/k");
-        if (prec_k != null) {
-            if (top_k) {
-                centralities.k = Integer.parseInt(prec_k);
-                if (centralities.k <= 0) {
-                    System.err.println("k must be > 0.");
-                    System.exit(1);
-                }
-                if (centralities.borassi) {
-                    System.err.println("Both Okamoto and Borassi algorithms selected. Choose only one of them.");
-                    System.exit(1);
-                }
-            }
-            else {
-                double precision = Double.parseDouble(prec_k);
-                if (precision > 1 || precision <= 0) {
-                    System.err.println("The precision value must lay in the [0,1] interval.");
-                    System.exit(1);
-                }
-                centralities.setPrecision(precision);
-            }
-        }
-        else {
-            System.err.println((top_k ? "k" : "precision") + " not specified");
+    private static void checkArgs() {
+        int count = 0;
+        if (naive) ++count;
+        if (borassi) ++count;
+        if (okamoto) ++count;
+        if (count > 1) {
+            System.err.println("Choose at maximum one algorithm.");
             System.exit(1);
         }
     }

@@ -48,10 +48,6 @@ public class HarmonicCentrality {
     private int[] randomSamples;
     /** Normalization term for the Eppstein estimated harmonic centrality value. */
     private double normalization;
-    /** Whether or not to compute the exact top-k harmonic centralities using the Okamoto algorithm. */
-    boolean top_k = false;
-    /** Whether or not to compute the exact top-k harmonic centralities using the Borassi et al. algorithm. */
-    boolean borassi = true;
     /** Number of top-k centralities to compute using the Okamoto algorithm. */
     int k = 0;
     /** Candidate set vector for the Okamoto algorithm. */
@@ -117,17 +113,15 @@ public class HarmonicCentrality {
     int additiveSamples() {
         return candidateSet.length - k;
     }
-    /** Computes the number of random samples to be computed according to the algorithm.
-     *
-     * @return the number of random samples.
-     */
-    private int numberOfSamples() {
-        /* Okamoto algorithm: it needs BETA * n^(2/3) * (log(n))^(1/3) nodes. */
-        if (top_k) {
-            return (int)Math.ceil(BETA * Math.cbrt(Math.pow(graph.numNodes(), 2) * Math.log(graph.numNodes())));
-        }
+
+
+    private int numberOfSamplesEpps() {
         /* Eppstein algorithm, it needs C * log(n) / epsilon^2 nodes. */
         return (int)Math.ceil(C * Math.log(graph.numNodes()) / Math.pow(precision, 2));
+    }
+
+    private int numberOfSamplesOka() {
+        return (int)Math.ceil(BETA * Math.cbrt(Math.pow(graph.numNodes(), 2) * Math.log(graph.numNodes())));
     }
 
     /** Computes k unique random samples computed uniformly at random.
@@ -165,8 +159,13 @@ public class HarmonicCentrality {
     }
 
     void setPrecision(double precision) {
-        this.precision = precision;
-        randomSamples = pickRandomSamples(numberOfSamples());
+        if (precision < 0) {
+            randomSamples = pickRandomSamples(numberOfSamplesOka());
+        }
+        else {
+            this.precision = precision;
+            randomSamples = pickRandomSamples(numberOfSamplesEpps());
+        }
     }
 
     /** f(l) function used by the Okamoto algorithm.
@@ -177,134 +176,6 @@ public class HarmonicCentrality {
         return ALPHA * Math.sqrt(Math.log(graph.numNodes()) / randomSamples.length);
     }
 
-    /** Computes the harmonic centralities using the required algorithm.
-     */
-    void compute() throws InterruptedException {
-        if (!borassi) {
-
-            normalization = (double) graph.numNodes() / ((double) (graph.numNodes() - 1) * (double) randomSamples.length);
-            HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
-
-            for (int executorService = 0; executorService < thread.length; ++executorService) {
-                thread[executorService] = new HarmonicCentrality.HarmonicApproximationThread();
-            }
-
-            if (this.pl != null) {
-                this.pl.start("Starting visits...");
-                this.pl.expectedUpdates = (long) this.graph.numNodes();
-                this.pl.itemsName = "nodes";
-            }
-
-            ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-            ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
-            int e = thread.length;
-
-            while (e-- != 0) executorCompletionService.submit(thread[e]);
-
-            try {
-                e = thread.length;
-
-                while (e-- != 0) {
-                    executorCompletionService.take().get();
-                }
-            } catch (ExecutionException var9) {
-                this.stop = true;
-                Throwable cause = var9.getCause();
-                throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
-            } finally {
-                var11.shutdown();
-            }
-
-            if (top_k) {
-                double[][] h = sort(harmonic);
-
-                int from = k - 1;
-                int additiveSamples = 0;
-                double threshold = f_function();
-                while (from + additiveSamples < graph.numNodes() && h[from + additiveSamples][0] >= h[from][0] - threshold) {
-                    ++additiveSamples;
-                }
-
-                candidateSet = new int[from + additiveSamples];
-                candidateSetHarmonics = new double[candidateSet.length];
-
-                for (int i = 0; i < candidateSet.length; ++i) {
-                    candidateSet[i] = (int) h[i][1];
-                }
-
-                HarmonicCentrality.HarmonicExactComputationThread[] exactComputationThreads = new HarmonicCentrality.HarmonicExactComputationThread[this.numberOfThreads];
-                HarmonicCentrality.this.nextNode.set(0);
-
-                for (int executorService = 0; executorService < exactComputationThreads.length; ++executorService) {
-                    exactComputationThreads[executorService] = new HarmonicCentrality.HarmonicExactComputationThread();
-                }
-
-                if (this.pl != null) {
-                    this.pl.start("Starting visits...");
-                    this.pl.expectedUpdates = (long) this.graph.numNodes();
-                    this.pl.itemsName = "nodes";
-                }
-
-                var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-                executorCompletionService = new ExecutorCompletionService(var11);
-
-                e = exactComputationThreads.length;
-
-                while (e-- != 0) executorCompletionService.submit(exactComputationThreads[e]);
-
-                try {
-                    e = exactComputationThreads.length;
-
-                    while (e-- != 0) {
-                        executorCompletionService.take().get();
-                    }
-                } catch (ExecutionException var9) {
-                    this.stop = true;
-                    Throwable cause = var9.getCause();
-                    throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
-                } finally {
-                    var11.shutdown();
-                }
-            }
-        }
-        else {
-            HarmonicCentrality.BFSCutThread[] thread = new HarmonicCentrality.BFSCutThread[this.numberOfThreads];
-
-            for (int executorService = 0; executorService < thread.length; ++executorService) {
-                thread[executorService] = new HarmonicCentrality.BFSCutThread();
-            }
-
-            if (this.pl != null) {
-                this.pl.start("Starting visits...");
-                this.pl.expectedUpdates = (long) this.graph.numNodes();
-                this.pl.itemsName = "nodes";
-            }
-
-            ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-            ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
-            int e = thread.length;
-
-            while (e-- != 0) executorCompletionService.submit(thread[e]);
-
-            try {
-                e = thread.length;
-
-                while (e-- != 0) {
-                    executorCompletionService.take().get();
-                }
-            } catch (ExecutionException var9) {
-                this.stop = true;
-                Throwable cause = var9.getCause();
-                throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
-            } finally {
-                var11.shutdown();
-            }
-        }
-
-        if (this.pl != null) {
-            this.pl.done();
-        }
-    }
 
     public void computeEppstein() throws InterruptedException {
         normalization = (double) graph.numNodes() / ((double) (graph.numNodes() - 1) * (double) randomSamples.length);
@@ -340,12 +211,13 @@ public class HarmonicCentrality {
             var11.shutdown();
         }
 
-        if (!top_k && this.pl != null) {
+        if (this.pl != null) {
             this.pl.done();
         }
     }
 
     public void computeOkamoto() throws InterruptedException {
+        computeEppstein();
         HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
         for (int executorService = 0; executorService < thread.length; ++executorService) {
             thread[executorService] = new HarmonicCentrality.HarmonicApproximationThread();
@@ -355,10 +227,7 @@ public class HarmonicCentrality {
             this.pl.expectedUpdates = (long) this.graph.numNodes();
             this.pl.itemsName = "nodes";
         }
-        ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
 
-        int e = thread.length;
         double[][] h = sort(harmonic);
 
         int from = k - 1;
@@ -388,10 +257,10 @@ public class HarmonicCentrality {
             this.pl.itemsName = "nodes";
         }
 
-        var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        executorCompletionService = new ExecutorCompletionService(var11);
+        ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
 
-        e = exactComputationThreads.length;
+        int e = exactComputationThreads.length;
 
         while (e-- != 0) executorCompletionService.submit(exactComputationThreads[e]);
 
@@ -407,6 +276,44 @@ public class HarmonicCentrality {
             throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
         } finally {
             var11.shutdown();
+        }
+    }
+
+    public void computeBorassi() throws InterruptedException {
+        HarmonicCentrality.BFSCutThread[] thread = new HarmonicCentrality.BFSCutThread[this.numberOfThreads];
+
+        for (int executorService = 0; executorService < thread.length; ++executorService) {
+            thread[executorService] = new HarmonicCentrality.BFSCutThread();
+        }
+
+        if (this.pl != null) {
+            this.pl.start("Starting visits...");
+            this.pl.expectedUpdates = (long) this.graph.numNodes();
+            this.pl.itemsName = "nodes";
+        }
+
+        ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
+        int e = thread.length;
+
+        while (e-- != 0) executorCompletionService.submit(thread[e]);
+
+        try {
+            e = thread.length;
+
+            while (e-- != 0) {
+                executorCompletionService.take().get();
+            }
+        } catch (ExecutionException var9) {
+            this.stop = true;
+            Throwable cause = var9.getCause();
+            throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
+        } finally {
+            var11.shutdown();
+        }
+
+        if (pl != null) {
+            pl.done();
         }
     }
 
@@ -441,7 +348,6 @@ public class HarmonicCentrality {
         }
 
         HarmonicCentrality centralities = new HarmonicCentrality(graph, threads, progressLogger);
-        centralities.top_k = top_k;
         String prec_k = jsapResult.getString("precision/k");
         if (prec_k != null) {
             if (top_k) {
