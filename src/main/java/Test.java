@@ -31,12 +31,12 @@ public class Test {
     /** Number of repetition runs */
     private final static int REPEAT = 5;
 
-    private static boolean naive = false;
-    private static boolean okamoto = false;
-    private static boolean borassi = false;
-    private static boolean hyperball = false;
     private static int topk = 1;
     private static double precision = 0.1;
+    private static Algorithm algorithm = Algorithm.NAIVE;
+    private enum Algorithm {
+        EPPSTEIN, OKAMOTO, BORASSI, NAIVE, HYPERANF
+    }
 
 
 
@@ -45,13 +45,11 @@ public class Test {
                 new Parameter[]{
                         new Switch("expand", 'e', "expand", "Expand the graph to increase speed (no compression)."),
                         new Switch("mapped", 'm', "mapped", "Use loadMapped() to load the graph."),
-                        new Switch("naive", 'n', "Use the naive algorithm to compute the exact harmonic centralities"),
+                        new Switch("eppstein", 'p', "Use the eppstein algorithm to compute the approximated harmonic centralities"),
                         new Switch("borassi", 'b', "Calculates the exact top-k Harmonic Centralities using the Borassi et al. algorithm."),
                         new Switch("okamoto", 'o', "Calculates the exact top-k Harmonic Centralities using the Okamoto et al. algorithm."),
                         new Switch("hyperball", 'h', "Runs HyperANF."),
                         new FlaggedOption("threads", JSAP.INTSIZE_PARSER, "0", false, 'T', "threads", "The number of threads to be used. If 0, the number will be estimated automatically."),
-                        //new UnflaggedOption("graphBasename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The basename of the graph."),
-                        //new UnflaggedOption("harmonicFilename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The filename where harmonic centrality scores (doubles in binary form) will be stored."),
                         new UnflaggedOption("precision/k", JSAP.DOUBLE_PARSER, JSAP.NO_DEFAULT, false, false, "The precision for the Eppstein algorithm.")
                 });
         JSAPResult jsapResult = jsap.parse(args);
@@ -60,20 +58,22 @@ public class Test {
         }
 
         boolean mapped = jsapResult.getBoolean("mapped", false);
-        okamoto = jsapResult.getBoolean("okamoto", false);
-        naive = jsapResult.getBoolean("naive", false);
-        borassi = jsapResult.getBoolean("borassi", false);
-        hyperball = jsapResult.getBoolean("hyperball", false);
-        boolean eppstein = !okamoto && !naive && !borassi && !hyperball;
+        if (jsapResult.getBoolean("eppstein", false)) algorithm = Algorithm.EPPSTEIN;
+        else if (jsapResult.getBoolean("borassi", false)) algorithm = Algorithm.BORASSI;
+        else if (jsapResult.getBoolean("okamoto", false)) algorithm = Algorithm.OKAMOTO;
+        else if (jsapResult.getBoolean("hyperball", false)) algorithm = Algorithm.HYPERANF;
 
         /* Number of threads. */
         int threads = jsapResult.getInt("threads");
 
-        if (borassi || okamoto) {
-            topk = jsapResult.getInt("precision/k");
-        }
-        else if (!naive && !hyperball) {
-            precision = jsapResult.getDouble("precision/k");
+        switch (algorithm) {
+            case EPPSTEIN:
+                precision = jsapResult.getDouble("precision/k");
+                break;
+            case OKAMOTO:
+            case BORASSI:
+                topk = jsapResult.getInt("precision/k");
+                break;
         }
 
         checkArgs();
@@ -84,7 +84,7 @@ public class Test {
 
 
         /* Generalized class. */
-        Object centralities;
+        Object centralities = null;
 
         /* Graphs on which perform the experiment. */
         File graphList = new File("GraphList.txt");
@@ -99,19 +99,25 @@ public class Test {
             Experiment experiment = new Experiment();
 
             final String algoString = "Algorithm";
-            if (naive) experiment.tag(algoString, "Naive");
-            else if (okamoto) {
-                experiment.tag(algoString, "Okamoto");
-                experiment.tag("k", topk);
-            }
-            else if (borassi) {
-                experiment.tag(algoString, "Borassi");
-                experiment.tag("k", topk);
-            }
-            else if (hyperball) experiment.tag(algoString, "HyperANF");
-            else {
-                experiment.tag(algoString , "Eppstein");
-                experiment.tag("Precision", precision);
+            switch (algorithm) {
+                case NAIVE:
+                    experiment.tag(algoString, "Naive");
+                    break;
+                case EPPSTEIN:
+                    experiment.tag(algoString , "Eppstein");
+                    experiment.tag("Precision", precision);
+                    break;
+                case BORASSI:
+                    experiment.tag(algoString, "Borassi");
+                    experiment.tag("k", topk);
+                    break;
+                case HYPERANF:
+                    experiment.tag(algoString, "HyperANF");
+                    break;
+                case OKAMOTO:
+                    experiment.tag(algoString, "Okamoto");
+                    experiment.tag("k", topk);
+                    break;
             }
 
             final String timingTableName = "Timing";
@@ -134,7 +140,6 @@ public class Test {
                 graph = (new ArrayListMutableGraph(graph)).immutableView();
             }
 
-
             for (int k = WARMUP + REPEAT; k-- != 0; ) {
                 ThreadMXBean bean = ManagementFactory.getThreadMXBean();
                 long time = 0;
@@ -142,51 +147,50 @@ public class Test {
                 long visited_arcs = 0;
                 boolean isWarmup = k < REPEAT;
 
-                if (naive) {
-                    centralities = new GeometricCentralities(graph, threads, progressLogger);
-                    time = bean.getCurrentThreadCpuTime();
-                    ((GeometricCentralities)centralities).compute();
-                    time = bean.getCurrentThreadCpuTime() - time;
-//                    if (k == REPEAT - 1) {
-//                        BinIO.storeDoubles(((GeometricCentralities)centralities).harmonic, harmonicsFileName);
-//                    }
-                    visited_arcs = ((GeometricCentralities)centralities).visitedArcs();
-                    visited_nodes = ((GeometricCentralities)centralities).visitedNodes();
-                }
-                else if (hyperball) {
-                    centralities = new HyperBall(graph, 7);
-                    time = bean.getCurrentThreadCpuTime();
-                    ((HyperBall)centralities).run();
-                    time = bean.getCurrentThreadCpuTime() - time;
-                }
-                else if (borassi) {
-                    centralities = new HarmonicCentrality(graph, threads, progressLogger);
-                    ((HarmonicCentrality) centralities).k = topk;
-                    ((HarmonicCentrality) centralities).setPrecision(-1);
-                    time = bean.getCurrentThreadCpuTime();
-                    ((HarmonicCentrality) centralities).computeBorassi();
-                    time = bean.getCurrentThreadCpuTime() - time;
-                    visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
-                    visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
-                }
-                else if(okamoto) {
-                    centralities = new HarmonicCentrality(graph, threads, progressLogger);
-                    ((HarmonicCentrality)centralities).k = topk;
-                    ((HarmonicCentrality)centralities).setPrecision(-1);
-                    time = bean.getCurrentThreadCpuTime();
-                    ((HarmonicCentrality)centralities).computeOkamoto();
-                    time = bean.getCurrentThreadCpuTime() - time;
-                    visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
-                    visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
-                }
-                else {
-                    centralities = new HarmonicCentrality(graph, threads, progressLogger);
-                    ((HarmonicCentrality)centralities).setPrecision(precision);
-                    time = bean.getCurrentThreadCpuTime();
-                    ((HarmonicCentrality)centralities).computeEppstein();
-                    time = bean.getCurrentThreadCpuTime() - time;
-                    visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
-                    visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
+                switch (algorithm) {
+                    case NAIVE:
+                        centralities = new GeometricCentralities(graph, threads, progressLogger);
+                        time = bean.getCurrentThreadCpuTime();
+                        ((GeometricCentralities)centralities).compute();
+                        time = bean.getCurrentThreadCpuTime() - time;
+                        visited_arcs = ((GeometricCentralities)centralities).visitedArcs();
+                        visited_nodes = ((GeometricCentralities)centralities).visitedNodes();
+                        break;
+                    case HYPERANF:
+                        centralities = new HyperBall(graph, (int)Math.log(threads));
+                        time = bean.getCurrentThreadCpuTime();
+                        ((HyperBall)centralities).run();
+                        time = bean.getCurrentThreadCpuTime() - time;
+                        break;
+                    case BORASSI:
+                        centralities = new HarmonicCentrality(graph, threads, progressLogger);
+                        ((HarmonicCentrality) centralities).k = topk;
+                        ((HarmonicCentrality) centralities).setPrecision(-1);
+                        time = bean.getCurrentThreadCpuTime();
+                        ((HarmonicCentrality) centralities).computeBorassi();
+                        time = bean.getCurrentThreadCpuTime() - time;
+                        visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
+                        visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
+                        break;
+                    case OKAMOTO:
+                        centralities = new HarmonicCentrality(graph, threads, progressLogger);
+                        ((HarmonicCentrality)centralities).k = topk;
+                        ((HarmonicCentrality)centralities).setPrecision(-1);
+                        time = bean.getCurrentThreadCpuTime();
+                        ((HarmonicCentrality)centralities).computeOkamoto();
+                        time = bean.getCurrentThreadCpuTime() - time;
+                        visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
+                        visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
+                        break;
+                    case EPPSTEIN:
+                        centralities = new HarmonicCentrality(graph, threads, progressLogger);
+                        ((HarmonicCentrality)centralities).setPrecision(precision);
+                        time = bean.getCurrentThreadCpuTime();
+                        ((HarmonicCentrality)centralities).computeEppstein();
+                        time = bean.getCurrentThreadCpuTime() - time;
+                        visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
+                        visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
+                        break;
                 }
 
                 int iteration = REPEAT - k;
@@ -197,45 +201,33 @@ public class Test {
                             "CPU Time", time,
                             "Visited nodes", visited_nodes,
                             "Visited arcs", visited_arcs);
-                    if (k == REPEAT - 1 && naive) {
-                        double[] harmonics = ((GeometricCentralities) centralities).harmonic;
-                        for (int c = 0; c < harmonics.length; ++c) {
-                            experiment.append("Centralities", "Node", c, "Value", harmonics[c]);
-                        }
-                    }
-                    else if (borassi) {
-
-                    }
-                    else if (okamoto) {
-
-                    }
-                    else if (hyperball) {
-
-                    }
-                    else { // Eppstein
-                        double[] harmonics  = ((HarmonicCentrality)centralities).harmonic;
-                        for (int c = 0; c < harmonics.length; ++c) {
-                            experiment.append("Centralities" + iteration, "Node", c, "Value", harmonics[c]);
-                        }
+                    switch (algorithm) {
+                        case OKAMOTO:
+                            break;
+                        case BORASSI:
+                            break;
+                        case NAIVE:
+                            if (k == (REPEAT - 1)) {
+                                double[] harmonics = ((GeometricCentralities) centralities).harmonic;
+                                for (int c = 0; c < harmonics.length; ++c) {
+                                    experiment.append("Centralities", "Node", c, "Value", harmonics[c]);
+                                }
+                            }
+                            break;
+                        case EPPSTEIN:
+                            double[] harmonics  = ((HarmonicCentrality)centralities).harmonic;
+                            for (int c = 0; c < harmonics.length; ++c) {
+                                experiment.append("Centralities", "Node", c, "Value", harmonics[c]);
+                            }
+                            break;
+                        case HYPERANF:
+                            break;
                     }
                 }
 
             }
-            File outFile;
-            String filename = "./results/" + currentGraph;
-            if (borassi) {
-                filename += "_borassi_" + topk;
-            }
-            else if (eppstein) {
-                filename += "_eppstein_" + precision;
-            }
-            else if (okamoto) {
-                filename += "_okamoto_" + topk;
-            }
 
-            filename += ".json";
-
-            outFile = new File(filename);
+            File outFile = new File(outFileName(currentGraph));
             OutputStream os = new FileOutputStream(outFile);
             PrintWriter out = new PrintWriter(os);
             out.write(JsonFormatter.format(experiment));
@@ -243,15 +235,65 @@ public class Test {
         }
     }
 
-    private static void checkArgs() {
-        int count = 0;
-        if (naive) ++count;
-        if (borassi) ++count;
-        if (okamoto) ++count;
-        if (count > 1) {
-            System.err.println("Choose at maximum one algorithm.");
-            System.exit(1);
+    private static String outCentralitiesFileName(String currentGraph) {
+        String filename = "./results/" + currentGraph;
+        switch (algorithm) {
+            case EPPSTEIN:
+                filename += "_eppstein_" + precision;
+                break;
+            case BORASSI:
+                filename += "_borassi_" + topk;
+                break;
+            case OKAMOTO:
+                filename += "_okamoto_" + topk;
+                break;
+            case HYPERANF:
+                filename += "_hyperanf_";
+            default:break;
         }
+        filename += "centralities.txt";
+        return filename;
+    }
+
+    private static String outFileName(String currentGraph) {
+        String filename = "./results/" + currentGraph;
+        switch (algorithm) {
+            case EPPSTEIN:
+                filename += "_eppstein_" + precision;
+                break;
+            case BORASSI:
+                filename += "_borassi_" + topk;
+                break;
+            case OKAMOTO:
+                filename += "_okamoto_" + topk;
+                break;
+            case HYPERANF:
+                filename += "_hyperanf_";
+            default:break;
+        }
+
+        filename += ".json";
+        return filename;
+    }
+
+    private static void checkArgs() {
+        switch (algorithm) {
+            case EPPSTEIN:
+                if (precision > 1 || precision <= 0) {
+                    reportArgsError("The precision must be > 0 and <= 1.");
+                }
+                break;
+            case OKAMOTO:
+            case BORASSI:
+                if (topk < 0) {
+                    reportArgsError("k must be > 0.");
+                }
+        }
+    }
+
+    private static void reportArgsError(String error) {
+        System.err.println(error);
+        System.exit(1);
     }
 
     /**

@@ -176,18 +176,17 @@ public class HarmonicCentrality {
         return ALPHA * Math.sqrt(Math.log(graph.numNodes()) / randomSamples.length);
     }
 
-
-    public void computeEppstein() throws InterruptedException {
+    void computeEppstein() throws InterruptedException {
         normalization = (double) graph.numNodes() / ((double) (graph.numNodes() - 1) * (double) randomSamples.length);
         HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
 
-        for (int executorService = 0; executorService < thread.length; ++executorService) {
+        for(int executorService = 0; executorService < thread.length; ++executorService) {
             thread[executorService] = new HarmonicCentrality.HarmonicApproximationThread();
         }
 
-        if (this.pl != null) {
+        if(this.pl != null) {
             this.pl.start("Starting visits...");
-            this.pl.expectedUpdates = (long) this.graph.numNodes();
+            this.pl.expectedUpdates = (long)this.graph.numNodes();
             this.pl.itemsName = "nodes";
         }
 
@@ -195,28 +194,30 @@ public class HarmonicCentrality {
         ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
         int e = thread.length;
 
-        while (e-- != 0) executorCompletionService.submit(thread[e]);
+        while(e-- != 0) {
+            executorCompletionService.submit(thread[e]);
+        }
 
         try {
             e = thread.length;
 
-            while (e-- != 0) {
+            while(e-- != 0) {
                 executorCompletionService.take().get();
             }
         } catch (ExecutionException var9) {
             this.stop = true;
             Throwable cause = var9.getCause();
-            throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
+            throw cause instanceof RuntimeException?(RuntimeException)cause:new RuntimeException(cause.getMessage(), cause);
         } finally {
             var11.shutdown();
         }
 
-        if (this.pl != null) {
+        if(this.pl != null) {
             this.pl.done();
         }
     }
 
-    public void computeOkamoto() throws InterruptedException {
+    void computeOkamoto() throws InterruptedException {
         computeEppstein();
         HarmonicCentrality.HarmonicApproximationThread[] thread = new HarmonicCentrality.HarmonicApproximationThread[this.numberOfThreads];
         for (int executorService = 0; executorService < thread.length; ++executorService) {
@@ -279,7 +280,7 @@ public class HarmonicCentrality {
         }
     }
 
-    public void computeBorassi() throws InterruptedException {
+    void computeBorassi() throws InterruptedException {
         HarmonicCentrality.BFSCutThread[] thread = new HarmonicCentrality.BFSCutThread[this.numberOfThreads];
 
         for (int executorService = 0; executorService < thread.length; ++executorService) {
