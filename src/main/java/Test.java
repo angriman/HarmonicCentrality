@@ -11,11 +11,11 @@ import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.Transform;
 import it.unimi.dsi.webgraph.algo.HyperBall;
 import it.unipd.dei.experiment.Experiment;
-import it.unipd.dei.experiment.JsonFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.util.Scanner;
@@ -38,6 +38,7 @@ public class Test {
         EPPSTEIN, OKAMOTO, BORASSI, NAIVE, HYPERANF
     }
 
+    private static final String resultsDir = "./results";
 
 
     public static void main(String[] args) throws IOException, JSAPException, InterruptedException {
@@ -72,7 +73,7 @@ public class Test {
                 break;
             case OKAMOTO:
             case BORASSI:
-                topk = jsapResult.getInt("precision/k");
+                topk = (int)jsapResult.getDouble("precision/k");
                 break;
         }
 
@@ -94,32 +95,6 @@ public class Test {
         while (scanner.hasNextLine()) {
 
             String currentGraph = scanner.nextLine();
-
-            /* Set up experimental metrics. */
-            Experiment experiment = new Experiment();
-
-            final String algoString = "Algorithm";
-            switch (algorithm) {
-                case NAIVE:
-                    experiment.tag(algoString, "Naive");
-                    break;
-                case EPPSTEIN:
-                    experiment.tag(algoString , "Eppstein");
-                    experiment.tag("Precision", precision);
-                    break;
-                case BORASSI:
-                    experiment.tag(algoString, "Borassi");
-                    experiment.tag("k", topk);
-                    break;
-                case HYPERANF:
-                    experiment.tag(algoString, "HyperANF");
-                    break;
-                case OKAMOTO:
-                    experiment.tag(algoString, "Okamoto");
-                    experiment.tag("k", topk);
-                    break;
-            }
-
             final String timingTableName = "Timing";
 
             /* Path where the graph is stored. */
@@ -128,10 +103,9 @@ public class Test {
             /* Reads the input graph. */
             ImmutableGraph graph = mapped ? ImmutableGraph.loadMapped(graphBasename, progressLogger) : ImmutableGraph.load(graphBasename, progressLogger);
 
-            experiment
-                    .tag("Graph Name", currentGraph)
-                    .tag("Num. nodes", graph.numNodes())
-                    .tag("Num. arcs", graph.numArcs());
+            long numNodes = graph.numNodes();
+            long numArcs = graph.numArcs();
+
 
             /* Transforms the graph to an undirected graph. */
             graph = Transform.symmetrize(graph);
@@ -141,6 +115,34 @@ public class Test {
             }
 
             for (int k = WARMUP + REPEAT; k-- != 0; ) {
+                /* Set up experimental metrics. */
+                Experiment experiment = new Experiment();
+
+                final String algoString = "Algorithm";
+                switch (algorithm) {
+                    case NAIVE:
+                        experiment.tag(algoString, "Naive");
+                        break;
+                    case EPPSTEIN:
+                        experiment.tag(algoString , "Eppstein");
+                        experiment.tag("Precision", precision);
+                        break;
+                    case BORASSI:
+                        experiment.tag(algoString, "Borassi");
+                        experiment.tag("k", topk);
+                        break;
+                    case HYPERANF:
+                        experiment.tag(algoString, "HyperANF");
+                        break;
+                    case OKAMOTO:
+                        experiment.tag(algoString, "Okamoto");
+                        experiment.tag("k", topk);
+                        break;
+                }
+                experiment
+                        .tag("Graph Name", currentGraph)
+                        .tag("Num. nodes", numNodes)
+                        .tag("Num. arcs", numArcs);
                 ThreadMXBean bean = ManagementFactory.getThreadMXBean();
                 long time = 0;
                 long visited_nodes = 0;
@@ -203,19 +205,36 @@ public class Test {
                             "Visited arcs", visited_arcs);
                     switch (algorithm) {
                         case OKAMOTO:
+                            int[] nodes = ((HarmonicCentrality)centralities).candidateSet;
+                            double[] harmonics = ((HarmonicCentrality)centralities).candidateSetHarmonics;
+                            double[][] sorted = new double[nodes.length][2];
+                            for (int i = 0; i < harmonics.length; ++i) {
+                                sorted[i][1] = (double)nodes[i];
+                                sorted[i][0] = harmonics[i];
+                            }
+
+                            HarmonicCentrality.sort(sorted);
+                            sorted = truncate(sorted);
+                            for (double[] aSorted : sorted) {
+                                experiment.append("Centralities", "Node", aSorted[1], "Value", aSorted[0]);
+                            }
                             break;
                         case BORASSI:
+                            double[][] borassiResult = ((HarmonicCentrality)centralities).getBorassiResult();
+                            harmonics = borassiResult[0];
+                            double[] nodeList = borassiResult[1];
+                            for (int i = 0; i < harmonics.length; ++i) {
+                                experiment.append("Centralities", "Node", nodeList[i], "Value", harmonics[i]);
+                            }
                             break;
                         case NAIVE:
-                            if (k == (REPEAT - 1)) {
-                                double[] harmonics = ((GeometricCentralities) centralities).harmonic;
-                                for (int c = 0; c < harmonics.length; ++c) {
-                                    experiment.append("Centralities", "Node", c, "Value", harmonics[c]);
-                                }
+                            harmonics = ((GeometricCentralities)centralities).harmonic;
+                            for (int c = 0; c < harmonics.length; ++c) {
+                                experiment.append("Centralities", "Node", c, "Value", harmonics[c]);
                             }
                             break;
                         case EPPSTEIN:
-                            double[] harmonics  = ((HarmonicCentrality)centralities).harmonic;
+                            harmonics = ((HarmonicCentrality) centralities).harmonic;
                             for (int c = 0; c < harmonics.length; ++c) {
                                 experiment.append("Centralities", "Node", c, "Value", harmonics[c]);
                             }
@@ -225,55 +244,57 @@ public class Test {
                     }
                 }
 
+               final String outString = currentResultString(currentGraph);
+                experiment.saveAsJsonFile(outString, false);
             }
-
-            File outFile = new File(outFileName(currentGraph));
-            OutputStream os = new FileOutputStream(outFile);
-            PrintWriter out = new PrintWriter(os);
-            out.write(JsonFormatter.format(experiment));
-            out.close();
         }
     }
 
-    private static String outCentralitiesFileName(String currentGraph) {
-        String filename = "./results/" + currentGraph;
+
+    private static String currentResultString(String currentGraph) {
+        String toReturn = "";
         switch (algorithm) {
             case EPPSTEIN:
-                filename += "_eppstein_" + precision;
-                break;
-            case BORASSI:
-                filename += "_borassi_" + topk;
+                toReturn = resultsDir + "/Eppstein/";
+                checkPath(toReturn);
+                toReturn += currentGraph;
+                checkPath(toReturn);
+                toReturn +=  "/" + precision + "/";
                 break;
             case OKAMOTO:
-                filename += "_okamoto_" + topk;
+                toReturn = resultsDir + "/Okamoto/";
+                checkPath(toReturn);
+                toReturn += currentGraph;
+                checkPath(toReturn);
+                toReturn += "/" + topk;
+                break;
+            case BORASSI:
+                toReturn = resultsDir + "/Borassi/";
+                checkPath(toReturn);
+                toReturn += currentGraph;
+                checkPath(toReturn);
+                toReturn += "/" + topk;
                 break;
             case HYPERANF:
-                filename += "_hyperanf_";
-            default:break;
+                toReturn = resultsDir + "/HyperAnf/";
+                checkPath(toReturn);
+                toReturn += currentGraph + "/";
+                break;
+            case NAIVE:
+                toReturn = resultsDir + "/Naive/" + currentGraph + "/";
+                break;
         }
-        filename += "centralities.txt";
-        return filename;
+        return toReturn;
     }
 
-    private static String outFileName(String currentGraph) {
-        String filename = "./results/" + currentGraph;
-        switch (algorithm) {
-            case EPPSTEIN:
-                filename += "_eppstein_" + precision;
-                break;
-            case BORASSI:
-                filename += "_borassi_" + topk;
-                break;
-            case OKAMOTO:
-                filename += "_okamoto_" + topk;
-                break;
-            case HYPERANF:
-                filename += "_hyperanf_";
-            default:break;
+    private static void checkPath(String path) {
+        if (!(new File(path).exists())) {
+            File dir = new File(path);
+            if (!dir.mkdir()) {
+                System.err.println("Failed when creating " + path);
+                System.exit(1);
+            }
         }
-
-        filename += ".json";
-        return filename;
     }
 
     private static void checkArgs() {
@@ -289,6 +310,21 @@ public class Test {
                     reportArgsError("k must be > 0.");
                 }
         }
+    }
+
+    private static double[][] truncate(double[][] result) {
+        if (topk >= result.length) {
+            return result;
+        }
+
+        int i = topk;
+        while (i < result.length && result[i] == result[topk - 1]) {
+            ++i;
+        }
+
+        double[][] toReturn = new double[i][2];
+        System.arraycopy(result, 0, toReturn, 0, i);
+        return toReturn;
     }
 
     private static void reportArgsError(String error) {

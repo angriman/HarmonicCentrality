@@ -15,10 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Random;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -492,6 +489,18 @@ public class HarmonicCentrality {
             return o2[0].compareTo(o1[0]);
         }
     });
+
+    double[][] getBorassiResult() {
+        double[][] result = new double[2][borassi_list.size()];
+        Iterator<Double[]> iterator = borassi_list.iterator();
+        Double[] current;
+        for (int i = 0; i < borassi_list.size(); ++i) {
+            current = iterator.next();
+            result[0][i] = current[0];
+            result[1][i] = current[1];
+        }
+        return result;
+    }
 
     private final class BFSCutThread implements Callable<Void> {
         private final IntArrayFIFOQueue queue;
