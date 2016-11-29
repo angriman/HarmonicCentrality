@@ -213,9 +213,17 @@ public class Test {
 
                             HarmonicCentrality.sort(sorted);
                             sorted = truncate(sorted);
+                            double[] ns = new double[sorted.length];
+                            harmonics = new double[sorted.length];
+
+                            for (int i = 0; i < sorted.length; ++i) {
+                                ns[i] = sorted[i][1];
+                                harmonics[i] = sorted[i][0];
+                            }
+
                             experiment.append("Centralities",
-                                    "Nodes", getStoredDoublesFileName(sorted[1]),
-                                    "Values", sorted[0]);
+                                    "Nodes", getStoredDoublesFileName(ns),
+                                    "Values", getStoredDoublesFileName(harmonics));
                             break;
                         case BORASSI:
                             double[][] borassiResult = ((HarmonicCentrality)centralities).getBorassiResult();
@@ -328,7 +336,7 @@ public class Test {
             ++i;
         }
 
-        double[][] toReturn = new double[i][2];
+        double[][] toReturn = new double[2][i];
         System.arraycopy(result, 0, toReturn, 0, i);
         return toReturn;
     }

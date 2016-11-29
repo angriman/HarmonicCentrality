@@ -589,15 +589,12 @@ public class HarmonicCentrality {
                 return;
             }
             borassi_list.remove(last);
-            //System.out.println("removing " + last[0] + " new min = " + Math.min(value, borassi_list.last()[0]));
         }
 
         Double[] newEntry = new Double[2];
         newEntry[0] = value;
         newEntry[1] = index;
-        //System.out.println(index + " " + value);
         borassi_list.add(newEntry);
-       // System.out.println(borassi_list.size());
     }
 
     /** Sorts a double array by keeping track of the corresponding index. It is useful in order to not losing
