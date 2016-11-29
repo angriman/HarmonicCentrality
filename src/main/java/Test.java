@@ -39,7 +39,7 @@ public class Test {
     }
 
     private static final String resultsDir = "./results";
-
+    private static final String centralitiesPath = resultsDir + "/centralities/";
 
     public static void main(String[] args) throws IOException, JSAPException, InterruptedException {
         SimpleJSAP jsap = new SimpleJSAP(HarmonicCentrality.class.getName(), "Computes positive centralities of a graph using multiple parallel breadth-first visits.\n\nPlease note that to compute negative centralities on directed graphs (which is usually what you want) you have to compute positive centralities on the transpose.",
@@ -94,6 +94,30 @@ public class Test {
         /* Experiments begins here */
         while (scanner.hasNextLine()) {
 
+            /* Set up experimental metrics. */
+            Experiment experiment = new Experiment();
+
+            final String algoString = "Algorithm";
+            switch (algorithm) {
+                case NAIVE:
+                    experiment.tag(algoString, "Naive");
+                    break;
+                case EPPSTEIN:
+                    experiment.tag(algoString , "Eppstein");
+                    experiment.tag("Precision", precision);
+                    break;
+                case BORASSI:
+                    experiment.tag(algoString, "Borassi");
+                    experiment.tag("k", topk);
+                    break;
+                case HYPERANF:
+                    experiment.tag(algoString, "HyperANF");
+                    break;
+                case OKAMOTO:
+                    experiment.tag(algoString, "Okamoto");
+                    experiment.tag("k", topk);
+                    break;
+            }
             String currentGraph = scanner.nextLine();
             final String timingTableName = "Timing";
 
@@ -103,9 +127,10 @@ public class Test {
             /* Reads the input graph. */
             ImmutableGraph graph = mapped ? ImmutableGraph.loadMapped(graphBasename, progressLogger) : ImmutableGraph.load(graphBasename, progressLogger);
 
-            long numNodes = graph.numNodes();
-            long numArcs = graph.numArcs();
-
+            experiment
+                    .tag("Graph Name", currentGraph)
+                    .tag("Num. nodes", graph.numNodes())
+                    .tag("Num. arcs", graph.numArcs());
 
             /* Transforms the graph to an undirected graph. */
             graph = Transform.symmetrize(graph);
@@ -115,34 +140,7 @@ public class Test {
             }
 
             for (int k = WARMUP + REPEAT; k-- != 0; ) {
-                /* Set up experimental metrics. */
-                Experiment experiment = new Experiment();
 
-                final String algoString = "Algorithm";
-                switch (algorithm) {
-                    case NAIVE:
-                        experiment.tag(algoString, "Naive");
-                        break;
-                    case EPPSTEIN:
-                        experiment.tag(algoString , "Eppstein");
-                        experiment.tag("Precision", precision);
-                        break;
-                    case BORASSI:
-                        experiment.tag(algoString, "Borassi");
-                        experiment.tag("k", topk);
-                        break;
-                    case HYPERANF:
-                        experiment.tag(algoString, "HyperANF");
-                        break;
-                    case OKAMOTO:
-                        experiment.tag(algoString, "Okamoto");
-                        experiment.tag("k", topk);
-                        break;
-                }
-                experiment
-                        .tag("Graph Name", currentGraph)
-                        .tag("Num. nodes", numNodes)
-                        .tag("Num. arcs", numArcs);
                 ThreadMXBean bean = ManagementFactory.getThreadMXBean();
                 long time = 0;
                 long visited_nodes = 0;
@@ -215,41 +213,43 @@ public class Test {
 
                             HarmonicCentrality.sort(sorted);
                             sorted = truncate(sorted);
-                            for (double[] aSorted : sorted) {
-                                experiment.append("Centralities", "Node", aSorted[1], "Value", aSorted[0]);
-                            }
+                            experiment.append("Centralities",
+                                    "Nodes", getStoredDoublesFileName(sorted[1]),
+                                    "Values", sorted[0]);
                             break;
                         case BORASSI:
                             double[][] borassiResult = ((HarmonicCentrality)centralities).getBorassiResult();
                             harmonics = borassiResult[0];
                             double[] nodeList = borassiResult[1];
-                            for (int i = 0; i < harmonics.length; ++i) {
-                                experiment.append("Centralities", "Node", nodeList[i], "Value", harmonics[i]);
-                            }
+                            experiment.append("Centralities",
+                                    "Nodes", getStoredDoublesFileName(nodeList),
+                                    "Values", getStoredDoublesFileName(harmonics));
+
                             break;
                         case NAIVE:
                             harmonics = ((GeometricCentralities)centralities).harmonic;
-                            for (int c = 0; c < harmonics.length; ++c) {
-                                experiment.append("Centralities", "Node", c, "Value", harmonics[c]);
-                            }
+                            experiment.append("Centralities", "Values", getStoredDoublesFileName(harmonics));
                             break;
                         case EPPSTEIN:
                             harmonics = ((HarmonicCentrality) centralities).harmonic;
-                            for (int c = 0; c < harmonics.length; ++c) {
-                                experiment.append("Centralities", "Node", c, "Value", harmonics[c]);
-                            }
+                            experiment.append("Centralities", "Values", getStoredDoublesFileName(harmonics));
                             break;
                         case HYPERANF:
                             break;
                     }
                 }
-
-               final String outString = currentResultString(currentGraph);
-                experiment.saveAsJsonFile(outString, false);
             }
+            final String outString = currentResultString(currentGraph);
+            experiment.saveAsJsonFile(outString, false);
+            System.out.println(experiment.toSimpleString());
         }
     }
 
+    private static String getStoredDoublesFileName(double[] arr) throws IOException {
+        String fileName = centralitiesPath + System.currentTimeMillis() + ".txt";
+        BinIO.storeDoubles(arr, fileName);
+        return fileName;
+    }
 
     private static String currentResultString(String currentGraph) {
         String toReturn = "";
@@ -291,8 +291,7 @@ public class Test {
         if (!(new File(path).exists())) {
             File dir = new File(path);
             if (!dir.mkdir()) {
-                System.err.println("Failed when creating " + path);
-                System.exit(1);
+                reportArgsError("Failed when creating " + path);
             }
         }
     }
@@ -309,6 +308,13 @@ public class Test {
                 if (topk < 0) {
                     reportArgsError("k must be > 0.");
                 }
+        }
+
+        if(!(new File(centralitiesPath).exists())) {
+            File dir = new File(centralitiesPath);
+            if (!dir.mkdir()) {
+                reportArgsError("Failed when creating " + centralitiesPath);
+            }
         }
     }
 
