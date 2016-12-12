@@ -264,9 +264,9 @@ public class Test {
                     }
                 }
             }
-            final String outString = currentResultString(currentGraph);
-            experiment.saveAsJsonFile(outString, false);
-            System.out.println(experiment.toSimpleString());
+//            final String outString = currentResultString(currentGraph);
+//            experiment.saveAsJsonFile(outString, false);
+//            System.out.println(experiment.toSimpleString());
         }
     }
 

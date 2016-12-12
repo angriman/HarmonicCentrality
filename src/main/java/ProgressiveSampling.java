@@ -5,6 +5,7 @@ import it.unimi.dsi.webgraph.NodeIterator;
 import org.apache.commons.lang.ArrayUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
@@ -16,6 +17,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 class ProgressiveSampling {
     /** The graph under examination. */
     private final ImmutableGraph graph;
+    /** Progressive sampling pace. */
+    private static final double ALPHA = 0.5;
     /** Harmonic centrality vector. */
     final double[] harmonic;
     /** Global progress logger. */
@@ -37,6 +40,13 @@ class ProgressiveSampling {
     /** Multiplicative constant in front of the Eppstein number of random samples formula.
      * The formula is: number of samples = log(n) / precision^2 */
     private static final double C = 1;
+    /** The number of extracted random samples until now. */
+    private int randomSamples;
+    /** Cumulated samples */
+    private int cumulatedSamples = 0;
+    /** Algorithm iterations. */
+    private final AtomicInteger iterations;
+    private boolean maxSamplesReached;
 
 
     ProgressiveSampling(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
@@ -46,12 +56,18 @@ class ProgressiveSampling {
         this.nextNode = new AtomicInteger();
         this.visitedArcs = new AtomicInteger();
         this.visitedNodes = new AtomicInteger();
+        this.iterations = new AtomicInteger();
         this.numberOfThreads = requestedThreads != 0 ? requestedThreads:Runtime.getRuntime().availableProcessors();
+        this.randomSamples = (int) Math.max(Math.log(graph.numNodes()), this.numberOfThreads);
     }
 
+    /**
+     * Computes (log(n) / epsilon^2) random samples.
+     * @return An int array containing the random samples.
+     */
     private int[] computeRandomSamples() {
         int[] result = new int[numberOfSamplesUpperBound()];
-        List<Integer> nodeList = new ArrayList<Integer>();
+        List<Integer> nodeList = new ArrayList<>();
         NodeIterator nodeIterator = graph.nodeIterator();
 
         while (nodeIterator.hasNext()) {
@@ -86,7 +102,6 @@ class ProgressiveSampling {
 
     void setPrecision(double precision) {
         this.precision = precision;
-        this.samples = computeRandomSamples();
     }
 
     void compute() throws InterruptedException {
@@ -102,7 +117,9 @@ class ProgressiveSampling {
             this.pl.itemsName = "nodes";
         }
 
-        while (stoppingConditions()) {
+        while (!maxSamplesReached) {
+
+            this.samples = computeRandomSamples();
 
             ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
             ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
@@ -125,6 +142,9 @@ class ProgressiveSampling {
             } finally {
                 var11.shutdown();
             }
+
+            iterations.getAndIncrement();
+            newRandomSamples();
         }
 
         if (pl != null) {
@@ -148,14 +168,28 @@ class ProgressiveSampling {
 
             while (true) {
                 int curr = ProgressiveSampling.this.nextNode.getAndIncrement();
-                if (ProgressiveSampling.this.stop || curr >= graph.numNodes()) {
+                if (ProgressiveSampling.this.stop || curr >= randomSamples) {
                     return null;
                 }
+
+                queue.clear();
+                queue.enqueue(samples[curr]);
+                Arrays.fill(distance, -1);
+                distance[samples[curr]] = 0;
             }
         }
     }
 
+    private void newRandomSamples() {
+        cumulatedSamples += randomSamples;
+        if (cumulatedSamples == samples.length) {
+            maxSamplesReached = true;
+        }
+        randomSamples = Math.min((int) Math.ceil((1 + ALPHA) * randomSamples), samples.length - cumulatedSamples);
+    }
+
     private boolean stoppingConditions() {
+
         return true;
     }
 }

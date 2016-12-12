@@ -521,8 +521,7 @@ public class HarmonicCentrality {
                     return null;
                 }
 
-                boolean DEBUG = (curr == 2);
-                double apx_h = 0, h = 0, gamma = 0, nd = 0, d = 0;
+                double apx_h, h = 0, gamma = 0, nd = 0, d = 0;
                 queue.clear();
                 queue.enqueue(curr);
                 Arrays.fill(distance, -1);
