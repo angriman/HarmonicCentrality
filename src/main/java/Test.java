@@ -34,12 +34,12 @@ public class Test {
     private static int topk = 1;
     private static double precision = 0.1;
     private static Algorithm algorithm = Algorithm.NAIVE;
-    private enum Algorithm {
-        EPPSTEIN, OKAMOTO, BORASSI, NAIVE, HYPERANF
+    enum Algorithm {
+        EPPSTEIN, OKAMOTO, BORASSI, NAIVE, HYPERANF, PROGRESSIVE
     }
 
     private static final String resultsDir = "./results";
-    private static final String centralitiesPath = resultsDir + "/centralities/";
+    static final String centralitiesPath = resultsDir + "/centralities/";
 
     public static void main(String[] args) throws IOException, JSAPException, InterruptedException {
         SimpleJSAP jsap = new SimpleJSAP(HarmonicCentrality.class.getName(), "Computes positive centralities of a graph using multiple parallel breadth-first visits.\n\nPlease note that to compute negative centralities on directed graphs (which is usually what you want) you have to compute positive centralities on the transpose.",
@@ -50,6 +50,7 @@ public class Test {
                         new Switch("borassi", 'b', "Calculates the exact top-k Harmonic Centralities using the Borassi et al. algorithm."),
                         new Switch("okamoto", 'o', "Calculates the exact top-k Harmonic Centralities using the Okamoto et al. algorithm."),
                         new Switch("hyperball", 'h', "Runs HyperANF."),
+                        new Switch("progressive", 's', "Performs progressive sampling with stopping conditions."),
                         new FlaggedOption("threads", JSAP.INTSIZE_PARSER, "0", false, 'T', "threads", "The number of threads to be used. If 0, the number will be estimated automatically."),
                         new UnflaggedOption("precision/k", JSAP.DOUBLE_PARSER, JSAP.NO_DEFAULT, false, false, "The precision for the Eppstein algorithm.")
                 });
@@ -63,12 +64,14 @@ public class Test {
         else if (jsapResult.getBoolean("borassi", false)) algorithm = Algorithm.BORASSI;
         else if (jsapResult.getBoolean("okamoto", false)) algorithm = Algorithm.OKAMOTO;
         else if (jsapResult.getBoolean("hyperball", false)) algorithm = Algorithm.HYPERANF;
+        else if (jsapResult.getBoolean("progressive", false)) algorithm = Algorithm.PROGRESSIVE;
 
         /* Number of threads. */
         int threads = jsapResult.getInt("threads");
 
         switch (algorithm) {
             case EPPSTEIN:
+            case PROGRESSIVE:
                 precision = jsapResult.getDouble("precision/k");
                 break;
             case OKAMOTO:
@@ -106,6 +109,9 @@ public class Test {
                     experiment.tag(algoString , "Eppstein");
                     experiment.tag("Precision", precision);
                     break;
+                case PROGRESSIVE:
+                    experiment.tag(algoString, "Progressive Sampling");
+                    experiment.tag("Precision", precision);
                 case BORASSI:
                     experiment.tag(algoString, "Borassi");
                     experiment.tag("k", topk);
@@ -117,7 +123,9 @@ public class Test {
                     experiment.tag(algoString, "Okamoto");
                     experiment.tag("k", topk);
                     break;
+                default:break;
             }
+
             String currentGraph = scanner.nextLine();
             final String timingTableName = "Timing";
 
@@ -190,6 +198,15 @@ public class Test {
                         time = bean.getCurrentThreadCpuTime() - time;
                         visited_arcs = ((HarmonicCentrality)centralities).visitedArcs();
                         visited_nodes = ((HarmonicCentrality)centralities).visitedNodes();
+                        break;
+                    case PROGRESSIVE:
+                        centralities = new ProgressiveSampling(graph, threads, progressLogger);
+                        ((ProgressiveSampling)centralities).setPrecision(precision);
+                        time = bean.getCurrentThreadCpuTime();
+                        ((ProgressiveSampling)centralities).compute();
+                        time = bean.getCurrentThreadCpuTime() - time;
+                        visited_arcs = ((ProgressiveSampling)centralities).visitedArcs();
+                        visited_nodes = ((ProgressiveSampling)centralities).visitedNodes();
                         break;
                 }
 
@@ -307,6 +324,7 @@ public class Test {
     private static void checkArgs() {
         switch (algorithm) {
             case EPPSTEIN:
+            case PROGRESSIVE:
                 if (precision > 1 || precision <= 0) {
                     reportArgsError("The precision must be > 0 and <= 1.");
                 }

@@ -1,8 +1,11 @@
+import it.unimi.dsi.fastutil.io.BinIO;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Scanner;
 
 /**
@@ -14,15 +17,28 @@ import java.util.Scanner;
  */
 public class Evaluate {
     public static void main(String[] args) throws IOException {
-        try {
-            File inputFile = new File("./results/dummygraph.json");
-            Scanner input = new Scanner(inputFile);
-            JSONObject reader = new JSONObject(input.nextLine());
-            JSONObject tags = reader.getJSONObject("tags");
-            System.out.println(tags.getInt("Num. arcs"));
-        }
-        catch (FileNotFoundException e) {
-            e.printStackTrace();
+        String resultPath = "./results/Borassi/dummygraph/1/";
+        File[] jsonList = (new File(resultPath)).listFiles();
+        for (File currentFile : jsonList) {
+            if (currentFile.isFile()) {
+                if (currentFile.getName().endsWith(".json")) {
+                    Scanner scanner = new Scanner(currentFile);
+                    JSONObject currentExperiment = new JSONObject(scanner.nextLine());
+                    Iterator<String> set = currentExperiment.keys();
+                    JSONObject tables = currentExperiment.getJSONObject("tables");
+                    JSONArray centralityTable = tables.getJSONArray("Centralities");
+                    for (int i = 1; i < centralityTable.length(); ++i) {
+                       //System.out.println(centralityTable.get(i));
+                        JSONObject currentCentrality = (JSONObject)centralityTable.get(i);
+                        String nodesFile = currentCentrality.getString("Nodes");
+                        String centralityFile = currentCentrality.getString("Values");
+                        double[] centralities = BinIO.loadDoubles(centralityFile);
+                        double[] nodes = BinIO.loadDoubles(nodesFile);
+                        System.out.println(Arrays.toString(centralities));
+                    }
+
+                }
+            }
         }
     }
 }

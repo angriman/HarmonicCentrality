@@ -40,7 +40,7 @@ public class HarmonicCentrality {
     /** Whether to stop abruptly the visiting process. */
     private volatile boolean stop;
     /** Required precision for the Eppstein algorithm. */
-    double precision;
+    private double precision;
     /** Random samples vector for the Eppstein algorithm. */
     private int[] randomSamples;
     /** Normalization term for the Eppstein estimated harmonic centrality value. */
@@ -60,7 +60,7 @@ public class HarmonicCentrality {
     private static final double BETA = 1;
     /** Multiplicative constant in front of the Eppstein number of random samples formula.
     * The formula is: number of samples = log(n) / precision^2 */
-    private static final double C = 0.25;
+    private static final double C = 1;
     /** Number of total visited nodes. */
     private final AtomicInteger visitedNodes;
     /** Number of total visited arcs. */
@@ -113,7 +113,7 @@ public class HarmonicCentrality {
 
 
     private int numberOfSamplesEpps() {
-        /* Eppstein algorithm, it needs C * log(n) / epsilon^2 nodes. */
+        /* Eppstein algorithm, it needs Big Theta of (C * log(n) / epsilon^2) nodes. */
         return (int)Math.ceil(C * Math.log(graph.numNodes()) / Math.pow(precision, 2));
     }
 
