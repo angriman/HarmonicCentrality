@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.DoubleStream;
 
 /**
  * Created by eugenio on 12/12/16.
@@ -23,7 +24,7 @@ class ProgressiveSampling {
     /** The graph under examination. */
     private final ImmutableGraph graph;
     /** Progressive sampling pace. */
-    private static final double ALPHA = 0.5;
+    private static final double ALPHA = 1;
     /** Harmonic centrality vector. */
     final double[] harmonic;
     /** Global progress logger. */
@@ -57,6 +58,7 @@ class ProgressiveSampling {
     private double[] nextHarmonic;
     private double[] absoluteErrors;
     private double[] relativeErrors;
+    private int prevSamples;
 
 
     ProgressiveSampling(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
@@ -181,10 +183,15 @@ class ProgressiveSampling {
 
             while (true) {
                 int curr = ProgressiveSampling.this.nextNode.getAndIncrement();
-                if (ProgressiveSampling.this.stop || curr >= randomSamples) {
+                if (curr >= randomSamples + cumulatedSamples) {
+                    ProgressiveSampling.this.nextNode.getAndDecrement();
+                    return null;
+                }
+                if (ProgressiveSampling.this.stop) {
                     return null;
                 }
 
+                //System.out.println("Iteration = " + iterations.get() + " node = " + curr + " continue until node <= " + (randomSamples + cumulatedSamples));
                 queue.clear();
                 queue.enqueue(samples[curr]);
                 Arrays.fill(distance, -1);
@@ -203,7 +210,7 @@ class ProgressiveSampling {
                             queue.enqueue(s);
                             visitedNodes.getAndIncrement();
                             distance[s] = d;
-                            ProgressiveSampling.this.nextHarmonic[s] += hd * normalization();
+                            ProgressiveSampling.this.nextHarmonic[s] += hd;
                         }
                     }
                 }
@@ -217,18 +224,24 @@ class ProgressiveSampling {
         }
     }
 
-    private double normalization() {
-        return (double)graph.numNodes() / (double)(ProgressiveSampling.this.randomSamples * (ProgressiveSampling.this.graph.numNodes() - 1));
+    private double normalization(boolean current) {
+        if (!current && prevSamples == 0) {
+            return 0;
+        }
+        return (double)graph.numNodes() / (double)((current ? cumulatedSamples : prevSamples) * (graph.numNodes() - 1));
     }
 
     private void newRandomSamples() {
         cumulatedSamples += randomSamples;
+
         if (cumulatedSamples == samples.length) {
             maxSamplesReached = true;
         }
         checkPrecision();
-
+        prevSamples = cumulatedSamples;
+        System.out.println(randomSamples);
         randomSamples = Math.min((int) Math.ceil((1 + ALPHA) * randomSamples), samples.length - cumulatedSamples);
+        System.out.println(randomSamples);
     }
 
     private boolean stoppingConditions() {
@@ -236,20 +249,27 @@ class ProgressiveSampling {
     }
 
     private void checkPrecision() {
-
         for (int i = 0; i < graph.numNodes(); ++i) {
-            ProgressiveSampling.this.absoluteErrors[i] = Math.abs(ProgressiveSampling.this.nextHarmonic[i] - ProgressiveSampling.this.prevHarmonic[i]);
-            ProgressiveSampling.this.relativeErrors[i] = (ProgressiveSampling.this.prevHarmonic[i] == 0) ?
-                    ProgressiveSampling.this.nextHarmonic[i] :
-                    Math.abs((ProgressiveSampling.this.nextHarmonic[i] - ProgressiveSampling.this.prevHarmonic[i]) / ProgressiveSampling.this.prevHarmonic[i]);
+            absoluteErrors[i] = Math.abs(nextHarmonic[i] * normalization(true) - prevHarmonic[i] * normalization(false));
+
+            relativeErrors[i] = (prevHarmonic[i] == 0) ?
+                    nextHarmonic[i] * normalization(true) :
+                    Math.abs((nextHarmonic[i] /(double)cumulatedSamples - prevHarmonic[i]/ prevSamples) / ((double)prevSamples) / (prevHarmonic[i] / prevSamples));
         }
+
 
         JSONArray abs = new JSONArray(Arrays.asList(absoluteErrors));
         JSONArray rel = new JSONArray(Arrays.asList(relativeErrors));
+        double[] harms = new double[nextHarmonic.length];
+        int i = 0;
 
+        for (double h : nextHarmonic) {
+            harms[i++] = h;
+        }
         JSONObject errors = new JSONObject();
         errors.put("Absolute", abs);
         errors.put("Relative", rel);
+        errors.put("Harmonics", new JSONArray(Arrays.asList(harms)));
 
         try (FileWriter file = new FileWriter("./results/errors"+iterations.get()+".json")) {
            errors.write(file);
