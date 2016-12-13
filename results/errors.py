@@ -6,18 +6,16 @@ files = [f for f in os.listdir('.') if os.path.isfile(f)]
 y_abs = []
 y_rel = []
 x_axis = []
-hvec = []
 iteration = 1
 for f in files:
 	if (f.endswith('.json')):
 		with open(f, 'r') as json_file:
 			data = json.load(json_file)
 
-		absolute = data['Absolute'][0]
-		relative = data['Relative'][0]
-		h = data["Harmonics"][0]
-		hvec.append(h[1])
-		print(sum(absolute))
+		absolute = data['Absolute']
+		relative = data['Relative']
+		# h = data["Harmonics"][0]
+		# print(sum(absolute))
 		x_axis.append(iteration)
 		y_abs.append(sum(absolute) / len(absolute))
 		y_rel.append(sum(relative) / len(relative))

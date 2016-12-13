@@ -258,8 +258,8 @@ class ProgressiveSampling {
         }
 
 
-        JSONArray abs = new JSONArray(Arrays.asList(absoluteErrors));
-        JSONArray rel = new JSONArray(Arrays.asList(relativeErrors));
+        JSONArray abs = new JSONArray(Arrays.toString(absoluteErrors));
+        JSONArray rel = new JSONArray(Arrays.toString(relativeErrors));
         double[] harms = new double[nextHarmonic.length];
         int i = 0;
 
@@ -269,7 +269,7 @@ class ProgressiveSampling {
         JSONObject errors = new JSONObject();
         errors.put("Absolute", abs);
         errors.put("Relative", rel);
-        errors.put("Harmonics", new JSONArray(Arrays.asList(harms)));
+        errors.put("Harmonics", new JSONArray(Arrays.toString(harms)));
 
         try (FileWriter file = new FileWriter("./results/errors"+iterations.get()+".json")) {
            errors.write(file);
