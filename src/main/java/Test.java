@@ -29,7 +29,7 @@ public class Test {
     /** Number of warm-up iterations */
     private final static int WARMUP = 0;
     /** Number of repetition runs */
-    private final static int REPEAT = 5;
+    private final static int REPEAT = 1;
 
     private static int topk = 1;
     private static double precision = 0.1;

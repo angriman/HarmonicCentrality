@@ -408,7 +408,7 @@ public class HarmonicCentrality {
                     int s;
                     while ((s = successors.nextInt()) != -1) {
                         visitedArcs.getAndIncrement();
-                        if(distance[s] == -1) {
+                        if (distance[s] == -1) {
                             queue.enqueue(s);
                             visitedNodes.getAndIncrement();
                             distance[s] = d;
@@ -521,7 +521,7 @@ public class HarmonicCentrality {
                     return null;
                 }
 
-                double apx_h, h = 0, gamma = 0, nd = 0, d = 0;
+                double apx_h = 0, h = 0, gamma = 0, nd = 0, d = 0;
                 queue.clear();
                 queue.enqueue(curr);
                 Arrays.fill(distance, -1);

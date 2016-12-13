@@ -1,9 +1,14 @@
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
+import it.unimi.dsi.webgraph.LazyIntIterator;
 import it.unimi.dsi.webgraph.NodeIterator;
 import org.apache.commons.lang.ArrayUtils;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -47,6 +52,11 @@ class ProgressiveSampling {
     /** Algorithm iterations. */
     private final AtomicInteger iterations;
     private boolean maxSamplesReached;
+    private boolean precisionReached;
+    private double[] prevHarmonic;
+    private double[] nextHarmonic;
+    private double[] absoluteErrors;
+    private double[] relativeErrors;
 
 
     ProgressiveSampling(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
@@ -59,6 +69,10 @@ class ProgressiveSampling {
         this.iterations = new AtomicInteger();
         this.numberOfThreads = requestedThreads != 0 ? requestedThreads:Runtime.getRuntime().availableProcessors();
         this.randomSamples = (int) Math.max(Math.log(graph.numNodes()), this.numberOfThreads);
+        this.prevHarmonic = new double[graph.numNodes()];
+        this.nextHarmonic = new double[graph.numNodes()];
+        this.absoluteErrors = new double[graph.numNodes()];
+        this.relativeErrors = new double[graph.numNodes()];
     }
 
     /**
@@ -110,16 +124,15 @@ class ProgressiveSampling {
         for (int executorService = 0; executorService < thread.length; ++executorService) {
             thread[executorService] = new ProgressiveSampling.ProgressiveSamplingThread();
         }
-
+        this.samples = computeRandomSamples();
         if (this.pl != null) {
             this.pl.start("Starting visits...");
-            this.pl.expectedUpdates = (long) this.graph.numNodes();
+            this.pl.expectedUpdates = (long) samples.length;
             this.pl.itemsName = "nodes";
         }
 
-        while (!maxSamplesReached) {
 
-            this.samples = computeRandomSamples();
+        while (stoppingConditions()) {
 
             ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
             ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
@@ -176,8 +189,36 @@ class ProgressiveSampling {
                 queue.enqueue(samples[curr]);
                 Arrays.fill(distance, -1);
                 distance[samples[curr]] = 0;
+
+                while (!queue.isEmpty()) {
+                    int node = queue.dequeueInt();
+                    int d = distance[node] + 1;
+                    double hd = 1.0D / (double) d;
+                    LazyIntIterator successors = graph.successors(node);
+                    int s;
+
+                    while ((s = successors.nextInt()) != -1) {
+                        visitedArcs.getAndIncrement();
+                        if (distance[s] == -1) {
+                            queue.enqueue(s);
+                            visitedNodes.getAndIncrement();
+                            distance[s] = d;
+                            ProgressiveSampling.this.nextHarmonic[s] += hd * normalization();
+                        }
+                    }
+                }
+
+                if (ProgressiveSampling.this.pl != null) {
+                    synchronized (ProgressiveSampling.this.pl) {
+                        ProgressiveSampling.this.pl.update();
+                    }
+                }
             }
         }
+    }
+
+    private double normalization() {
+        return (double)graph.numNodes() / (double)(ProgressiveSampling.this.randomSamples * (ProgressiveSampling.this.graph.numNodes() - 1));
     }
 
     private void newRandomSamples() {
@@ -185,11 +226,38 @@ class ProgressiveSampling {
         if (cumulatedSamples == samples.length) {
             maxSamplesReached = true;
         }
+        checkPrecision();
+
         randomSamples = Math.min((int) Math.ceil((1 + ALPHA) * randomSamples), samples.length - cumulatedSamples);
     }
 
     private boolean stoppingConditions() {
+        return !(maxSamplesReached || precisionReached);
+    }
 
-        return true;
+    private void checkPrecision() {
+
+        for (int i = 0; i < graph.numNodes(); ++i) {
+            ProgressiveSampling.this.absoluteErrors[i] = Math.abs(ProgressiveSampling.this.nextHarmonic[i] - ProgressiveSampling.this.prevHarmonic[i]);
+            ProgressiveSampling.this.relativeErrors[i] = (ProgressiveSampling.this.prevHarmonic[i] == 0) ?
+                    ProgressiveSampling.this.nextHarmonic[i] :
+                    Math.abs((ProgressiveSampling.this.nextHarmonic[i] - ProgressiveSampling.this.prevHarmonic[i]) / ProgressiveSampling.this.prevHarmonic[i]);
+        }
+
+        JSONArray abs = new JSONArray(Arrays.asList(absoluteErrors));
+        JSONArray rel = new JSONArray(Arrays.asList(relativeErrors));
+
+        JSONObject errors = new JSONObject();
+        errors.put("Absolute", abs);
+        errors.put("Relative", rel);
+
+        try (FileWriter file = new FileWriter("./results/errors"+iterations.get()+".json")) {
+           errors.write(file);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        System.arraycopy(nextHarmonic, 0, prevHarmonic, 0, nextHarmonic.length - 1);
+
     }
 }
