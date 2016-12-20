@@ -34,6 +34,7 @@ public class Test {
     private static int topk = 1;
     private static double precision = 0.1;
     private static Algorithm algorithm = Algorithm.NAIVE;
+    private static String currentGraphName;
     enum Algorithm {
         EPPSTEIN, OKAMOTO, BORASSI, NAIVE, HYPERANF, PROGRESSIVE
     }
@@ -127,6 +128,7 @@ public class Test {
             }
 
             String currentGraph = scanner.nextLine();
+            currentGraphName = currentGraph;
             final String timingTableName = "Timing";
 
             /* Path where the graph is stored. */
@@ -146,6 +148,8 @@ public class Test {
             if (jsapResult.userSpecified("expand")) {
                 graph = (new ArrayListMutableGraph(graph)).immutableView();
             }
+
+            System.out.println("NUMBER OF NODES = " + graph.numNodes());
 
             for (int k = WARMUP + REPEAT; k-- != 0; ) {
 
@@ -259,15 +263,23 @@ public class Test {
                             harmonics = ((HarmonicCentrality) centralities).harmonic;
                             experiment.append("Centralities", "Values", getStoredDoublesFileName(harmonics));
                             break;
+                        case PROGRESSIVE:
+                            harmonics = ((ProgressiveSampling) centralities).getNormalizedHarmonics();
+                            experiment.append("Centralities", "Values", getStoredDoublesFileName(harmonics));
+                            break;
                         case HYPERANF:
                             break;
                     }
                 }
             }
-//            final String outString = currentResultString(currentGraph);
-//            experiment.saveAsJsonFile(outString, false);
-//            System.out.println(experiment.toSimpleString());
+            final String outString = currentResultString(currentGraph);
+            experiment.saveAsJsonFile(outString, false);
+            //System.out.println(experiment.toSimpleString());
         }
+    }
+
+    public static String currentGraphName() {
+        return currentGraphName;
     }
 
     private static String getStoredDoublesFileName(double[] arr) throws IOException {
@@ -308,11 +320,19 @@ public class Test {
             case NAIVE:
                 toReturn = resultsDir + "/Naive/" + currentGraph + "/";
                 break;
+            case PROGRESSIVE:
+                toReturn = resultsDir + "/Progressive/";
+                checkPath(toReturn);
+                toReturn += currentGraph;
+                checkPath(toReturn);
+                toReturn += "/" + precision + "/";
+                checkPath(toReturn);
+                break;
         }
         return toReturn;
     }
 
-    private static void checkPath(String path) {
+    public static void checkPath(String path) {
         if (!(new File(path).exists())) {
             File dir = new File(path);
             if (!dir.mkdir()) {

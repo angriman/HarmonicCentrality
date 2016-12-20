@@ -6,10 +6,7 @@
 import com.martiansoftware.jsap.*;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.logging.ProgressLogger;
-import it.unimi.dsi.webgraph.ArrayListMutableGraph;
-import it.unimi.dsi.webgraph.ImmutableGraph;
-import it.unimi.dsi.webgraph.LazyIntIterator;
-import it.unimi.dsi.webgraph.Transform;
+import it.unimi.dsi.webgraph.*;
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,7 +127,16 @@ public class HarmonicCentrality {
         /* Check whether 0 < k <= n. */
         if (k >= graph.numNodes()) {
             System.err.println("Number of random samples to be extracted greater than n.");
-            System.exit(1);
+            List<Integer> allNodes = new ArrayList<>();
+            NodeIterator iterator = graph.nodeIterator();
+            while(iterator.hasNext()) {
+                allNodes.add(iterator.nextInt());
+            }
+            Collections.shuffle(allNodes);
+            int[] toReturn = new int[graph.numNodes()];
+            Integer[] shuffled = allNodes.toArray(new Integer[0]);
+            System.arraycopy(ArrayUtils.toPrimitive(shuffled), 0, toReturn, 0, graph.numNodes() - 1);
+            return toReturn;
         }
         if (k < 0) {
             System.err.println("Negative number of random samples.");
@@ -138,7 +144,7 @@ public class HarmonicCentrality {
         }
 
         /* Tree structure for better performances. */
-        TreeSet<Integer> set = new TreeSet<Integer>();
+        TreeSet<Integer> set = new TreeSet<>();
         /* How many different samples have been extracted at each loop. */
         int count = 0;
         /* For integer random extraction. */
