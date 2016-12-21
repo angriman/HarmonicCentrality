@@ -3,7 +3,6 @@ import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
 import it.unimi.dsi.webgraph.NodeIterator;
-import org.apache.commons.lang.ArrayUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -85,12 +84,14 @@ class ProgressiveSampling {
         while (nodeIterator.hasNext()) {
             nodeList.add(nodeIterator.nextInt());
         }
-
+//
         Collections.shuffle(nodeList);
         Integer[] shuffledArray = nodeList.toArray(new Integer[0]);
+        RandomSamplesExtractor extractor = new RandomSamplesExtractor(graph);
+        return extractor.compute();
 
-        System.arraycopy(ArrayUtils.toPrimitive(shuffledArray), 0, result, 0, result.length - 1);
-        return result;
+        //System.arraycopy(ArrayUtils.toPrimitive(shuffledArray), 0, result, 0, result.length - 1);
+        //return result;
     }
 
     private int numberOfSamplesUpperBound() {
