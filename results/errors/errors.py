@@ -20,14 +20,13 @@ if arg2Name == '1':
 
 values = []
 nodes = []
-files = sorted([f for f in os.listdir("./" + netName)])
 y_abs = []
 y_rel = [] 
 max_abs = []
 max_rel = []
 x_axis = []
 iteration = 1
-for f in files:
+for f in sorted([f for f in os.listdir("./" + netName)]):
 	if (f.endswith('.json') and not f.startswith('errors1')):
 		with open("./"+netName+"/"+str(f), 'r') as json_file:
 			data = json.load(json_file)

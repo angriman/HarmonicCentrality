@@ -40,12 +40,9 @@ public class RandomSamplesExtractor {
         int n = 0;
         while (nodeIterator.hasNext()) {
             int curr = nodeIterator.nextInt();
-            //randomExtract.add((double)n++ / (double)graph.numNodes());
             nodeScore[curr] = score(curr);
         }
 
-       // Collections.shuffle(randomExtract);
-//
         double[] pdf = computePDist();
         double[] cdf = new double[pdf.length];
         n = 0;
@@ -53,16 +50,10 @@ public class RandomSamplesExtractor {
         for (int i = 1; i < pdf.length - 1; ++i) {
             cdf[i] = cdf[i - 1] + pdf[i];
         }
-
-        //System.out.println(isSorted(cdf) ? "Sorted" : "Not sorted");
         double min = min(pdf);
-//        List<Integer> randomExtract = new ArrayList<>();
-//        for (int i = 0; i< (int) Math.ceil((double)1 / min); ++i) {
-//             randomExtract.add(i);
-//        }
+
         int[] result = new int[graph.numNodes()];
 
-//       Collections.shuffle(randomExtract);
        List<Integer> pool = new ArrayList<>();
         for (int i = 0; i<graph.numNodes(); ++i) {
             for (int j = 0; j < Math.floor(pdf[i]/min); ++j) {
@@ -77,16 +68,6 @@ public class RandomSamplesExtractor {
             }
         }
 
-//        System.out.println(checkPool(pool) ? "Success" : "Fail");
-//        int count = 0;
-//        for (Integer next : randomExtract) {
-//            int pos = (int) Math.floor(next * min);
-//            int entry = pool[pos];
-//            if (!ArrayUtils.contains(result, entry)) {
-//                result[count] = entry;
-//                ++count;
-//            }
-//        }
         return result;
     }
 

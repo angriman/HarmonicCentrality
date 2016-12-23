@@ -4,89 +4,81 @@ import json
 import sys
 import math
 
-topk_percentages = [0.01, 0.1, 1, 5]
-percentage = 1
-cut = 0
+topk_percentages = [0.1, 1, 2, 5]
 values = []
 nodes = []
 x_axis = []
-iteration = 0
+iterations = 0
 absolute = []
 relative = []
+nodes_cut = []
 if len(sys.argv) < 2:
 	print('Not enough parameters')
 	sys.exit()
 
 netName = str(sys.argv[1])
 for f in sorted([f for f in os.listdir("./" + netName)]):
-	if (f.endswith('.json')) and not f.startswith('errors1'):
+	if (f.endswith('.json')) and not f.startswith('errors1.json'):
 		with open("./" + netName + "/" + str(f), 'r') as json_file:
 			data = json.load(json_file)
 
-		h = data['Harmonics']
-		n = data['Nodes']
-		cut = math.ceil(topk_percentages[percentage] * len(h) / 100)
-		values.append(h)
-		nodes.append(n)
+		values.append(data['Harmonics'])
+		nodes.append(data['Nodes'])
 		absolute.append(data['Absolute'])
 		relative.append(data['Relative'])
-		iteration += 1
-		x_axis.append(iteration)
+		x_axis.append(iterations)
+		iterations += 1
 
+abs_perc_lines = []
+rel_perc_lines = []
+n = len(values[0])
+for p in topk_percentages:
+	abs_curr_p_line = []
+	rel_curr_p_line = []
+	for i in range(iterations):
+		cut = max(math.ceil(p * n / 100), 1)
+		abs_curr_p_line.append(sum(absolute[i][0:cut]) / cut)
+		rel_curr_p_line.append(sum(relative[i][0:cut]) / cut)
+	abs_perc_lines.append(abs_curr_p_line)
+	rel_perc_lines.append(rel_curr_p_line)
+
+
+font = {'family' : 'normal',
+        'weight' : 'bold',
+        'size'   : 22}
+
+plt.rc('font', **font)
 
 plt.figure(1)
 plt.grid(True)
-plt.ylabel('TopK Absolute error metric')
+plt.title('Top K Average absolute error metric.')
+labels = []
+root = 'Top '
+for p in topk_percentages:
+	labels.append(root + str(p) + '%')
+lines = []
+count = 0
+for l in abs_perc_lines:
+	line, = plt.plot(x_axis, l, label=labels[count], linewidth=3)
+	count += 1
+	lines.append(line)
 
-# plt.ylabel('Harmonic Centrality estimation')
-# plt.xlabel('Iteration')
-# plt.title('Top ' + str(cut) + ' centralities')
-abs_lines = []
-rel_lines  =[]
-# labels = []
-nodes_union = set()
-for n in nodes:
-	nodes_union = nodes_union.union(set(n[0:cut]))
-nodes_union = list(nodes_union)
-for c in nodes_union:
-	abs_line = []
-	rel_line = []
-	iteration = 0
-	# for a in relative:
-	# 	count = 0
-	# 	while not nodes[iteration][count] == c:
-	# 		count += 1
-	# 	abs_line.append(relative[iteration][count])
-	# 	iteration += 1
-	# abs_lines.append(abs_line)
-	for vs in values:
-		count = 0
-		while not nodes[iteration][count] == c:
-			count += 1
-		abs_line.append(values[iteration][count])
-		iteration += 1
-	abs_lines.append(abs_line)
-	#labels.append(str(c))
+plt.legend(handles=lines)
 
-# pltLines = []
-# count = 0
-for l in abs_lines:
-	line, = plt.plot(x_axis, l, linewidth=2)
-plt.title('Top ' + str(cut) + ' rel. error metric')
-	# count += 1
-	# pltLines.append(line)
-	#plt.legend(handles=pltLines, loc=9)
+plt.figure(2)
+plt.grid(True)
+plt.title('Top K Average relative error metric.')
+labels = []
+root = 'Top '
+for p in topk_percentages:
+	labels.append(root + str(p) + '%')
+lines = []
+count = 0
+for l in rel_perc_lines:
+	line, = plt.plot(x_axis, l, label=labels[count], linewidth=3)
+	count += 1
+	lines.append(line)
 
-# plt.figure(2)
-# plt.grid(True)
-# plt.xlabel('Iteration')
-# plt.ylabel('Top k set size')
-# size = []
-# nodes_union = set()
-# for n in nodes:
-# 	nodes_union.update(set(n[0:cut]))
-# 	size.append(len(nodes_union))
-# plt.plot(x_axis, size, linewidth=3)
-# plt.title('Top ' + str(cut) + ' centralities')
-	
+plt.legend(handles=lines)
 plt.show()
+

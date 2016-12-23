@@ -3,6 +3,7 @@ import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
 import it.unimi.dsi.webgraph.NodeIterator;
+import org.apache.commons.lang3.ArrayUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -87,11 +88,11 @@ class ProgressiveSampling {
 //
         Collections.shuffle(nodeList);
         Integer[] shuffledArray = nodeList.toArray(new Integer[0]);
-        RandomSamplesExtractor extractor = new RandomSamplesExtractor(graph);
-        return extractor.compute();
+//        RandomSamplesExtractor extractor = new RandomSamplesExtractor(graph);
+//        return extractor.compute();
 
-        //System.arraycopy(ArrayUtils.toPrimitive(shuffledArray), 0, result, 0, result.length - 1);
-        //return result;
+        System.arraycopy(ArrayUtils.toPrimitive(shuffledArray), 0, result, 0, result.length - 1);
+        return result;
     }
 
     private int numberOfSamplesUpperBound() {
@@ -251,8 +252,8 @@ class ProgressiveSampling {
         }
         checkPrecision();
         prevSamples = cumulatedSamples;
-        randomSamples = Math.min((int) Math.ceil((1 + ALPHA) * cumulatedSamples), samples.length - cumulatedSamples);
-        System.out.println(randomSamples);
+        //randomSamples = Math.min((int) Math.ceil((1 + ALPHA) * cumulatedSamples), samples.length - cumulatedSamples);
+        randomSamples = Math.min(samples.length - cumulatedSamples, randomSamples);
     }
 
     private boolean stoppingConditions() {
@@ -263,13 +264,14 @@ class ProgressiveSampling {
        // double[] gt = (new Evaluate()).getGT();
       //  double[] realAbs = new double[nextHarmonic.length];
       //  double[] realRel = new double[nextHarmonic.length];
-
+        double nextNorm = normalization(true);
+        double prevNorm = normalization(false);
         for (int i = 0; i < graph.numNodes(); ++i) {
-            absoluteErrors[i] = Math.abs(nextHarmonic[i] * normalization(true) - prevHarmonic[i] * normalization(false));
+            absoluteErrors[i] = Math.abs(nextHarmonic[i] * nextNorm - prevHarmonic[i] * prevNorm);
 
             relativeErrors[i] = (prevHarmonic[i] == 0) ?
-                    nextHarmonic[i] * normalization(true) :
-                    Math.abs((nextHarmonic[i] /(double)cumulatedSamples - prevHarmonic[i]/ prevSamples) / ((double)prevSamples) / (prevHarmonic[i] / prevSamples));
+                    nextHarmonic[i] * nextNorm :
+                    Math.abs((nextHarmonic[i] * nextNorm - prevHarmonic[i] * prevNorm) / (prevHarmonic[i] * prevNorm));
             //gt[i] /= (double)(graph.numNodes() - 1);
            // realAbs[i] = Math.abs(nextHarmonic[i] * normalization(true) - gt[i]);
            // realRel[i] = gt[i] == 0 ? nextHarmonic[i] * normalization(true) : Math.abs(nextHarmonic[i] * normalization(true) - gt[i]) / gt[i];
