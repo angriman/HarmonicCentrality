@@ -7,9 +7,7 @@ import org.apache.commons.lang.ArrayUtils;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 /**
  * Created by eugenio on 21/12/16.
@@ -35,17 +33,74 @@ public class RandomSamplesExtractor {
 
     /* Da parallelizzare se va bene */
     public int[] compute() {
+        return degreeSort();
+    }
+
+    private int[] degreeSort() {
         NodeIterator nodeIterator = graph.nodeIterator();
-        //List<Double> randomExtract = new ArrayList<>();
-        int n = 0;
+        Integer[] nodes = new Integer[graph.numNodes()];
+        int k = 0;
+        while (nodeIterator.hasNext()) {
+            nodes[k++] = nodeIterator.nextInt();
+        }
+
+        Arrays.sort(nodes, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer t1, Integer t2) {
+                return (new Integer(graph.outdegree(t2))).compareTo(graph.outdegree(t1));
+            }
+        });
+
+        return ArrayUtils.toPrimitive(nodes);
+    }
+
+    public int[] update(int samples, int[] current, double[] estimated) {
+        Integer[] result = new Integer[current.length];
+        Arrays.fill(result, -1);
+        System.arraycopy(ArrayUtils.toObject(current), 0, result, 0, samples);
+        double[][] h = HarmonicCentrality.sort(estimated);
+        int count = samples;
+        for (int i = 0; i < current.length; ++i) {
+            Integer currentNode = (int) h[i][1];
+
+            if (!Arrays.asList(result).contains(currentNode)) {
+                result[count++] = currentNode;
+            }
+
+        }
+        return ArrayUtils.toPrimitive(result);
+    }
+
+    private int[] uniformlyAtRandom() {
+        List<Integer> nodeList = new ArrayList<>();
+        NodeIterator nodeIterator = graph.nodeIterator();
+
+        while (nodeIterator.hasNext()) {
+            nodeList.add(nodeIterator.nextInt());
+        }
+        Collections.shuffle(nodeList);
+        Integer[] shuffledArray = nodeList.toArray(new Integer[0]);
+        return ArrayUtils.toPrimitive(shuffledArray);
+    }
+
+    private int[] wrongNeighborhood() {
+        NodeIterator nodeIterator = graph.nodeIterator();
+        Integer[] nodes = new Integer[graph.numNodes()];
+        int n;
+        int k = 0;
         while (nodeIterator.hasNext()) {
             int curr = nodeIterator.nextInt();
+            nodes[k++] = curr;
             nodeScore[curr] = score(curr);
         }
+        Arrays.sort(nodes, new Comparator<Integer>() {
+            public int compare(Integer s1, Integer s2) {
+                return s1.compareTo(s2);
+            }
+        });
 
         double[] pdf = computePDist();
         double[] cdf = new double[pdf.length];
-        n = 0;
         cdf[cdf.length - 1] = 1;
         for (int i = 1; i < pdf.length - 1; ++i) {
             cdf[i] = cdf[i - 1] + pdf[i];
@@ -54,7 +109,7 @@ public class RandomSamplesExtractor {
 
         int[] result = new int[graph.numNodes()];
 
-       List<Integer> pool = new ArrayList<>();
+        List<Integer> pool = new ArrayList<>();
         for (int i = 0; i<graph.numNodes(); ++i) {
             for (int j = 0; j < Math.floor(pdf[i]/min); ++j) {
                 pool.add(i);
@@ -68,7 +123,8 @@ public class RandomSamplesExtractor {
             }
         }
 
-        return result;
+        //return result;
+        return ArrayUtils.toPrimitive(nodes);
     }
 
     private boolean checkPool(int[] pool) {
