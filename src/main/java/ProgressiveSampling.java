@@ -2,7 +2,9 @@ import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
+import it.unimi.dsi.webgraph.NodeIterator;
 import org.apache.commons.lang.ArrayUtils;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.FileWriter;
@@ -83,7 +85,7 @@ class ProgressiveSampling {
 
     public double[] getNormalizedHarmonics() {
         double[] toReturn = new double[nextHarmonic.length];
-        System.arraycopy(nextHarmonic, 0, toReturn, 0, nextHarmonic.length - 1);
+        System.arraycopy(nextHarmonic, 0, toReturn, 0, nextHarmonic.length);
         double norm = (double)(graph.numNodes()) / (double)((graph.numNodes() - 1) * cumulatedSamples);
         System.out.println(norm);
         for (int i = 0; i < toReturn.length; ++i) {
@@ -235,9 +237,9 @@ class ProgressiveSampling {
         }
         checkPrecision();
         prevSamples = cumulatedSamples;
-        //randomSamples = Math.min((int) Math.ceil((1 + ALPHA) * cumulatedSamples), samples.length - cumulatedSamples);
+       // randomSamples = Math.min((int) Math.ceil((1 + ALPHA) * cumulatedSamples), samples.length - cumulatedSamples);
         randomSamples = Math.min(samples.length - cumulatedSamples, randomSamples);
-        samples = (new RandomSamplesExtractor(graph)).update(cumulatedSamples, samples, nextHarmonic);
+        //samples = (new RandomSamplesExtractor(graph)).update(cumulatedSamples, samples, nextHarmonic, iterations.get());
     }
 
     private boolean stoppingConditions() {
@@ -262,32 +264,50 @@ class ProgressiveSampling {
         }
 
 
-//        JSONArray abs = new JSONArray(Arrays.toString(absoluteErrors));
-//        JSONArray rel = new JSONArray(Arrays.toString(relativeErrors));
-//        double[][] h = HarmonicCentrality.sort(nextHarmonic);
-//        double[] harmonics = new double[graph.numNodes()];
-//        double[] nodes = new double[graph.numNodes()];
-//        for (int i = 0; i < harmonics.length; ++i) {
-//            harmonics[i] = h[i][0] * normalization(true);
-//            nodes[i] = h[i][1];
-//        }
-        Integer[] sortedCentralities = new Integer[graph.numNodes()];
-        for (int i = 0; i < graph.numNodes(); ++i) {
-            sortedCentralities[i] = i;
+        JSONArray abs = new JSONArray(Arrays.toString(absoluteErrors));
+        JSONArray rel = new JSONArray(Arrays.toString(relativeErrors));
+        double[][] h = HarmonicCentrality.sort(nextHarmonic);
+        double[] harmonics = new double[graph.numNodes()];
+        double[] nodes = new double[graph.numNodes()];
+
+        for (int i = 0; i < harmonics.length; ++i) {
+            harmonics[i] = h[i][0] * normalization(true);
+            nodes[i] = h[i][1];
         }
+
+        Integer[] sortedCentralities = new Integer[graph.numNodes()];
+
+        NodeIterator nodeIterator = graph.nodeIterator();
+        int count = 0;
+        while (nodeIterator.hasNext()) {
+            sortedCentralities[count++] = nodeIterator.nextInt();
+        }
+
         Arrays.sort(sortedCentralities, new Comparator<Integer>() {
             @Override
             public int compare(Integer t1, Integer t2) {
                 return gt[t2].compareTo(gt[t1]);
             }
         });
+
         JSONObject errors = new JSONObject();
-//        errors.put("Absolute", abs);
-//        errors.put("Relative", rel);
-//        errors.put("Harmonics", harmonics);
-//        errors.put("Nodes", nodes);
-        int[] currentSamples = new int[cumulatedSamples];
-        System.arraycopy(samples, 0, currentSamples, 0, currentSamples.length);
+        errors.put("Absolute", abs);
+        errors.put("Relative", rel);
+        errors.put("Harmonics", harmonics);
+        errors.put("Nodes", nodes);
+        Integer[] currentSamples = new Integer[cumulatedSamples];
+
+        //System.arraycopy(samples, 0, currentSamples, 0, currentSamples.length);
+        for (int i = 0; i < currentSamples.length; ++i) {
+            currentSamples[i] = samples[i];
+        }
+        Arrays.sort(currentSamples, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer t1, Integer t2) {
+                return gt[t2].compareTo(gt[t1]);
+            }
+        });
+
         errors.put("CurrentExact", currentSamples);
         errors.put("GTNodes", sortedCentralities);
         errors.put("GT", gt);
@@ -304,6 +324,7 @@ class ProgressiveSampling {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.arraycopy(nextHarmonic, 0, prevHarmonic, 0, nextHarmonic.length - 1);
+
+        System.arraycopy(nextHarmonic, 0, prevHarmonic, 0, nextHarmonic.length);
     }
 }

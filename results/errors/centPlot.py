@@ -21,6 +21,15 @@ def checkIntersection(sub, total_set):
 		result.append(len(set(sub).intersection(set(total_set[0:cut]))) / cut)
 	return result
 
+def checkPrecision(sampledNodes, apxNodes, gtNodes):
+	result = []
+	for p in topk_perc:
+		cut = int(p * len(gtNodes) / 100) + 1
+		result.append(len((set(sampledNodes).union(set(apxNodes[0:cut])).intersection(set(gtNodes[0:cut])))) / cut)
+	return result
+
+
+
 import re
 
 def atoi(text):
@@ -43,27 +52,33 @@ n = 0
 samples = []
 correctly_detected = []
 c = 0
-file_list = [f for f in os.listdir("./facebook/")]
+netName = "wordassociation-2011"
+iteration = 0
+file_list = [f for f in os.listdir("./"+netName+"/")]
 for f in sorted(file_list, key=natural_keys):
 	if f.endswith('.json') and not f.startswith('exact'):
-		with open("./facebook/" + str(f), 'r') as json_file:
+		with open("./"+netName+"/" + str(f), 'r') as json_file:
 			data = json.load(json_file)
 
-		gtNodes = data["GTNodes"]
+		gtNodes = data["GTNodes"] # Nodi ordinati
 		n = len(gtNodes)
+		gt = [x / (n - 1) for x in sorted(data['GT'], reverse=True)]
+		apx_nodes = data['Nodes']		
+		
 		curr = data['CurrentExact']
-		result = checkIntersection(curr, gtNodes)
+		result =  checkPrecision(curr, apx_nodes, gtNodes) #checkIntersection(curr, gtNodes)
 		correctly_detected.append(result)
 		#x_ax.append(len(curr))
 		samples.append(len(curr))
+		iteration += 1
 
 x_ax = [x for x in range(len(correctly_detected))]
 font = {'family' : 'Bitstream Vera Sans',
         'weight' : 'bold',
         'size'   : 14}
 
-
 plt.rc('font', **font)
+
 plt.figure(1)
 plt.grid(True)
 lines = []	
@@ -85,6 +100,7 @@ plt.legend(handles=plt_lines,loc=1)
 plt.title('Greedy sampling')
 plt.xlabel('Computed BFS')
 plt.ylabel('Precision among Top K')
+
 plt.show()
 
 # fig = plt.figure(1)

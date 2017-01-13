@@ -5,6 +5,9 @@
     <content url="file://$MODULE_DIR$/../..">
       <excludeFolder url="file://$MODULE_DIR$/../../.gradle" />
       <excludeFolder url="file://$MODULE_DIR$/../../build" />
+      <excludeFolder url="file://$MODULE_DIR$/../../results/errors/cnr-2000-hc" />
+      <excludeFolder url="file://$MODULE_DIR$/../../results/errors/facebook" />
+      <excludeFolder url="file://$MODULE_DIR$/../../results/errors/wordassociation-2011" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

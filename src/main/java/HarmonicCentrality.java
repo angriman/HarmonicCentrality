@@ -135,7 +135,7 @@ public class HarmonicCentrality {
             Collections.shuffle(allNodes);
             int[] toReturn = new int[graph.numNodes()];
             Integer[] shuffled = allNodes.toArray(new Integer[0]);
-            System.arraycopy(ArrayUtils.toPrimitive(shuffled), 0, toReturn, 0, graph.numNodes() - 1);
+            System.arraycopy(ArrayUtils.toPrimitive(shuffled), 0, toReturn, 0, graph.numNodes());
             return toReturn;
         }
         if (k < 0) {
@@ -619,7 +619,7 @@ public class HarmonicCentrality {
 
     /** Sorts a 2D array with respect to the value contained in the 1st dimension.
      *
-     * @param arr the sorted array
+     * @param arr array to be sorted
      */
     static void sort(double[][] arr) {
         Arrays.sort(arr, new Comparator<double[]>() {
@@ -629,4 +629,26 @@ public class HarmonicCentrality {
         });
     }
 
+    static double[][] scoreSort(double[] arr, final int max_deg, final ImmutableGraph graph) {
+        double[][] newArr = new double[arr.length][2];
+        for (int i = 0; i < arr.length; ++i) {
+            newArr[i][0] = arr[i];
+            newArr[i][1] = i;
+        }
+
+        Arrays.sort(newArr, new Comparator<double[]>() {
+            @Override
+            public int compare(double[] e1, double[] e2) {
+                double s1 = score(graph.outdegree((int) e1[1]), max_deg, e1[0]);
+                double s2 = score(graph.outdegree((int) e2[1]), max_deg, e2[0]);
+                return (Double.valueOf(s2).compareTo(s1));
+            }
+        });
+
+        return newArr;
+    }
+
+    private static double score(int deg, int max_deg, double apx) {
+        return (double)deg / (double)max_deg + apx;
+    }
 }

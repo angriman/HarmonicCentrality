@@ -54,21 +54,54 @@ public class RandomSamplesExtractor {
         return ArrayUtils.toPrimitive(nodes);
     }
 
-    public int[] update(int samples, int[] current, double[] estimated) {
-        Integer[] result = new Integer[current.length];
-        Arrays.fill(result, -1);
-        System.arraycopy(ArrayUtils.toObject(current), 0, result, 0, samples);
-        double[][] h = HarmonicCentrality.sort(estimated);
-        int count = samples;
-        for (int i = 0; i < current.length; ++i) {
-            Integer currentNode = (int) h[i][1];
-
-            if (!Arrays.asList(result).contains(currentNode)) {
-                result[count++] = currentNode;
-            }
-
+    private int[] outDegreeArray(Integer[] nodes) {
+        int[] result = new int[nodes.length];
+        for (int n = 0; n < result.length; ++n) {
+            result[n] = graph.outdegree(nodes[n]);
         }
-        return ArrayUtils.toPrimitive(result);
+        return result;
+    }
+
+
+
+    public int[] update(int samples, int[] current, double[] estimated, int iteration) {
+        if (iteration >= 3) {
+            Integer[] result = new Integer[current.length];
+            Arrays.fill(result, -1);
+            System.arraycopy(ArrayUtils.toObject(current), 0, result, 0, samples);
+            //double[][] h = HarmonicCentrality.sort(estimated);
+          // System.out.println(findMax(normalize(estimated,samples)));
+            double[][] h = HarmonicCentrality.scoreSort(normalize(estimated,samples), graph.outdegree(current[0]), graph);
+            int count = samples;
+            for (int i = 0; i < current.length; ++i) {
+                Integer currentNode = (int) h[i][1];
+
+                if (!Arrays.asList(result).contains(currentNode)) {
+                    result[count++] = currentNode;
+                }
+
+            }
+            return ArrayUtils.toPrimitive(result);
+        }
+        return current;
+    }
+
+    private double[] normalize(double[] arr, int samples) {
+        double[] result = new double[arr.length];
+        double n = (double)arr.length;
+        double mult = n / ((n-1) * (double)samples);
+        for (int i = 0; i<arr.length; ++i) {
+            result[i] = arr[i] * mult;
+        }
+        return result;
+    }
+
+    private double findMax(double[] arr) {
+        double max = 0;
+        for (double x : arr) {
+            max = Math.max(x, max);
+        }
+        return max;
     }
 
     private int[] uniformlyAtRandom() {
