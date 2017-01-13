@@ -30,17 +30,31 @@ def checkStability(sampled, prev):
 
 	return result
 
-def stableNodes(iteration, pool):
-	if iteration == len(pool)-1:
-		return len(pool[len(pool)-1])
-	s = 0
-	for i in range(len(pool[iteration])):
-		first = pool[iteration][i]
-		for j in range(iteration+1, len(pool)):
-			if not first == pool[j][i]:
-				return s
-		s += 1
-	return s
+# def stableNodes(iteration, pool):
+# 	if iteration == len(pool)-1:
+# 		return len(pool[len(pool)-1])
+# 	s = 0
+# 	for i in range(len(pool[iteration])):
+# 		first = pool[iteration][i]
+# 		for j in range(iteration+1, len(pool)):
+# 			if not first == pool[j][i]:
+# 				return s
+# 		s += 1
+# 	return s
+
+def stableNodes(pool):
+	result = [0 for x in range(len(pool))]
+	for i in range(len(pool[len(pool) - 1])):
+		first = pool[len(pool)-1][i]
+		for j in range(len(pool)-1, 0, -1):
+			if i >= len(pool[j]) or not pool[j][i] == first:
+				break
+			else:
+				result[j] += 1
+				first = pool[j][i]
+	return result
+
+
 
 netName = "wordassociation-2011"
 x_ax = []
@@ -57,21 +71,23 @@ for f in sorted(file_list, key=natural_keys):
 		with open("./"+netName+"/" + str(f), 'r') as json_file:
 			data = json.load(json_file)
 
-		current_exact = data['Nodes'] #data['CurrentExact']
+		current_exact = data['CurrentExact']
 		pool.append(current_exact)
-		# if iteration > 0:
-		# 	stability.append(checkStability(current_exact, prev))
-		# else:
-		# 	stability.append([0 for x in topk_perc])
-		# 	stable_nodes.append(0)
-		# 	n = len(data['GT'])
+		if iteration > 0:
+			stability.append(checkStability(current_exact, prev))
+		else:
+			stability.append([0 for x in topk_perc])
+			stable_nodes.append(0)
+			n = len(data['GT'])
 
 		# prev = current_exact
 		iteration += 1
-		x_ax.append(len(current_exact))
+		#x_ax.append(len(current_exact))
+		x_ax.append(iteration)
 
-for i in range(1, iteration):
-	stable_nodes.append(stableNodes(i, pool))
+#for i in range(1, iteration):
+#	stable_nodes.append(stableNodes(i, pool))
+stable_nodes = stableNodes(pool)
 
 
 font = {'family' : 'Bitstream Vera Sans',
@@ -103,7 +119,7 @@ plt.figure(1)
 
 plt.figure(2)
 plt.grid(True)
-plt.plot(x_ax, stable_nodes, linewidth=3)
+plt.plot(x_ax[0:len(x_ax)], stable_nodes[0:len(stable_nodes)], linewidth=3)
 plt.xlabel("Computed BFSs")
 plt.ylabel("Overall stability")
 plt.show()

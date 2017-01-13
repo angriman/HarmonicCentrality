@@ -33,7 +33,7 @@ public class RandomSamplesExtractor {
 
     /* Da parallelizzare se va bene */
     public int[] compute() {
-        return uniformlyAtRandom();
+        return degreeSort();
     }
 
     private int[] degreeSort() {
