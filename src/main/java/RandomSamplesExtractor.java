@@ -62,8 +62,6 @@ public class RandomSamplesExtractor {
         return result;
     }
 
-
-
     public int[] update(int samples, int[] current, double[] estimated, int iteration) {
         if (iteration >= 3) {
             Integer[] result = new Integer[current.length];
@@ -71,7 +69,8 @@ public class RandomSamplesExtractor {
             System.arraycopy(ArrayUtils.toObject(current), 0, result, 0, samples);
             //double[][] h = HarmonicCentrality.sort(estimated);
           // System.out.println(findMax(normalize(estimated,samples)));
-            double[][] h = HarmonicCentrality.scoreSort(normalize(estimated,samples), graph.outdegree(current[0]), graph);
+           // double[][] h = HarmonicCentrality.scoreSort(normalize(estimated,samples), graph.outdegree(current[0]), graph);
+            double[][] h = HarmonicCentrality.estimatedCentralitySort(estimated);
             int count = samples;
             for (int i = 0; i < current.length; ++i) {
                 Integer currentNode = (int) h[i][1];
@@ -79,10 +78,11 @@ public class RandomSamplesExtractor {
                 if (!Arrays.asList(result).contains(currentNode)) {
                     result[count++] = currentNode;
                 }
-
             }
+
             return ArrayUtils.toPrimitive(result);
         }
+
         return current;
     }
 

@@ -624,7 +624,8 @@ public class HarmonicCentrality {
     static void sort(double[][] arr) {
         Arrays.sort(arr, new Comparator<double[]>() {
             public int compare(double[] e1, double[] e2) {
-                return(Double.valueOf(e2[0]).compareTo(e1[0]));
+                int first = (Double.valueOf(e2[0]).compareTo(e1[0]));
+                return first == 0 ? Integer.valueOf((int) e2[1]).compareTo((int) e1[1]) : first;
             }
         });
     }
@@ -641,7 +642,26 @@ public class HarmonicCentrality {
             public int compare(double[] e1, double[] e2) {
                 double s1 = score(graph.outdegree((int) e1[1]), max_deg, e1[0]);
                 double s2 = score(graph.outdegree((int) e2[1]), max_deg, e2[0]);
-                return (Double.valueOf(s2).compareTo(s1));
+                int first = (Double.valueOf(s2).compareTo(s1));
+                return first == 0 ? Integer.valueOf((int) e2[1]).compareTo((int) e1[1]) : first;
+            }
+        });
+
+        return newArr;
+    }
+
+    static double[][] estimatedCentralitySort(double[] arr) {
+        double[][] newArr = new double[arr.length][2];
+        for (int i = 0; i < arr.length; ++i) {
+            newArr[i][0] = arr[i];
+            newArr[i][1] = i;
+        }
+
+        Arrays.sort(newArr, new Comparator<double[]>() {
+            @Override
+            public int compare(double[] e1, double[] e2) {
+                int first = (Double.valueOf(e2[0]).compareTo(e1[0]));
+                return first == 0 ? Integer.valueOf((int) e2[1]).compareTo((int) e1[1]) : first;
             }
         });
 

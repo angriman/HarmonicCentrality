@@ -239,7 +239,8 @@ class ProgressiveSampling {
         prevSamples = cumulatedSamples;
        // randomSamples = Math.min((int) Math.ceil((1 + ALPHA) * cumulatedSamples), samples.length - cumulatedSamples);
         randomSamples = Math.min(samples.length - cumulatedSamples, randomSamples);
-        //samples = (new RandomSamplesExtractor(graph)).update(cumulatedSamples, samples, nextHarmonic, iterations.get());
+       if (iterations.get() >= 10)
+            samples = (new RandomSamplesExtractor(graph)).update(cumulatedSamples, samples, nextHarmonic, iterations.get());
     }
 
     private boolean stoppingConditions() {
@@ -286,7 +287,8 @@ class ProgressiveSampling {
         Arrays.sort(sortedCentralities, new Comparator<Integer>() {
             @Override
             public int compare(Integer t1, Integer t2) {
-                return gt[t2].compareTo(gt[t1]);
+                int first = gt[t2].compareTo(gt[t1]);
+                return (first == 0) ? t2.compareTo(t1) : first;
             }
         });
 
@@ -304,7 +306,8 @@ class ProgressiveSampling {
         Arrays.sort(currentSamples, new Comparator<Integer>() {
             @Override
             public int compare(Integer t1, Integer t2) {
-                return gt[t2].compareTo(gt[t1]);
+                int first = gt[t2].compareTo(gt[t1]);
+                return (first == 0) ? t2.compareTo(t1) : first;
             }
         });
 
@@ -324,7 +327,43 @@ class ProgressiveSampling {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        int k = 10;
+        if (currentSamples.length > k) {
+            double confidence = approximationPrecision();
 
+            Integer[] topComputed = new Integer[k];
+            System.arraycopy(currentSamples, 0, topComputed, 0, k);
+            double highestEstimated = 0;
+            int index = 0;
+            for (double i : nodes) {
+                if (!Arrays.asList(topComputed).contains((int) i)) {
+                    highestEstimated = nextHarmonic[(int)i];
+                    index = (int)i;
+                    break;
+                }
+                index = (int)i;
+            }
+
+
+            double threshold = highestEstimated  + (double) graph.outdegree(index) + 0.5 * Math.max(0, (graph.numNodes() - cumulatedSamples - graph.outdegree(index)));//confidence + highestEstimated;
+            threshold /= (double)(graph.numNodes() - 1);
+            System.out.println("Highest estimated = " + threshold);
+            //System.out.println("Confidence = " + confidence);
+            System.out.println("GT = " + (gt[currentSamples[k-1]] / ((double)(graph.numNodes() - 1))));
+            if (gt[currentSamples[k-1]] / ((double)(graph.numNodes() - 1)) > threshold) {
+                System.out.println("STOP");
+            }
+        }
+        //System.out.println(approximationPrecision());
         System.arraycopy(nextHarmonic, 0, prevHarmonic, 0, nextHarmonic.length);
+    }
+
+    private double approximationPrecision() {
+        if (cumulatedSamples <= 0) {
+            return 0;
+        }
+       // return Math.pow((double) graph.numNodes() / ((double)(graph.numNodes() - 1)), 2) * 0.5 * (1.0D / (Math.log(2))) * (1.0D / (double)cumulatedSamples) * Math.log(graph.numNodes());
+        return Math.sqrt(Math.log(graph.numNodes()) / cumulatedSamples);
+
     }
 }

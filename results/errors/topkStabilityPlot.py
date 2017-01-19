@@ -65,6 +65,7 @@ prev = []
 stability = []
 stable_nodes = []
 pool = []
+samples = 0
 file_list = [f for f in os.listdir("./"+netName+"/")]
 for f in sorted(file_list, key=natural_keys):
 	if f.endswith('.json') and not f.startswith('exact'):
@@ -79,11 +80,12 @@ for f in sorted(file_list, key=natural_keys):
 			stability.append([0 for x in topk_perc])
 			stable_nodes.append(0)
 			n = len(data['GT'])
+			samples = len(data['CurrentExact'])
 
 		# prev = current_exact
 		iteration += 1
-		#x_ax.append(len(current_exact))
-		x_ax.append(iteration)
+		x_ax.append(iteration * samples)
+		#x_ax.append(iteration)
 
 #for i in range(1, iteration):
 #	stable_nodes.append(stableNodes(i, pool))
@@ -95,7 +97,7 @@ font = {'family' : 'Bitstream Vera Sans',
         'size'   : 14}
 
 plt.rc('font', **font)
-plt.figure(1)
+# plt.figure(1)
 # plt.grid(True)
 # legend = []
 # lines = []
