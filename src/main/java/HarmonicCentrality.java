@@ -8,6 +8,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.*;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,7 @@ public class HarmonicCentrality {
     private final ImmutableGraph graph;
     /** Harmonic centrality vector. */
     final double[] harmonic;
+    double[] closeness;
     /** Global progress logger. */
     private final ProgressLogger pl;
     /** Number of threads. */
@@ -242,7 +244,7 @@ public class HarmonicCentrality {
         }
 
         candidateSet = new int[from + additiveSamples];
-        candidateSetHarmonics = new double[candidateSet.length];
+        closeness = new double[candidateSet.length];
 
         for (int i = 0; i < candidateSet.length; ++i) {
             candidateSet[i] = (int) h[i][1];
@@ -337,6 +339,7 @@ public class HarmonicCentrality {
         if(jsap.messagePrinted()) {
             System.exit(1);
         }
+
 
         boolean mapped = jsapResult.getBoolean("mapped", false);
         boolean top_k = jsapResult.getBoolean("top_k", false);
@@ -474,6 +477,7 @@ public class HarmonicCentrality {
                             queue.enqueue(s);
                             distance[s] = d;
                             HarmonicCentrality.this.candidateSetHarmonics[curr] += hd;
+                            HarmonicCentrality.this.closeness[curr] += d;
                         }
                     }
                 }
@@ -662,6 +666,23 @@ public class HarmonicCentrality {
             public int compare(double[] e1, double[] e2) {
                 int first = (Double.valueOf(e2[0]).compareTo(e1[0]));
                 return first == 0 ? Integer.valueOf((int) e2[1]).compareTo((int) e1[1]) : first;
+            }
+        });
+
+        return newArr;
+    }
+
+    static double[][] estimatedHarmonicSort(double[] arr) {
+        double[][] newArr = new double[arr.length][2];
+        for (int i = 0; i < arr.length; ++i) {
+            newArr[i][0] = arr[i];
+            newArr[i][1] = i;
+        }
+
+        Arrays.sort(newArr, new Comparator<double[]>() {
+            @Override
+            public int compare(double[] o1, double[] o2) {
+                return Double.valueOf(o2[0]).compareTo(o1[0]);
             }
         });
 

@@ -149,7 +149,7 @@ public class Test {
                 graph = (new ArrayListMutableGraph(graph)).immutableView();
             }
 
-            System.out.println("NUMBER OF NODES = " + graph.numNodes());
+            // System.out.println("NUMBER OF NODES = " + graph.numNodes());
 
             for (int k = WARMUP + REPEAT; k-- != 0; ) {
 
@@ -257,7 +257,8 @@ public class Test {
                             break;
                         case NAIVE:
                             harmonics = ((GeometricCentralities)centralities).harmonic;
-                            experiment.append("Centralities", "Values", getStoredDoublesFileName(harmonics));
+                            double[] closeness = ((GeometricCentralities)centralities).closeness;
+                            experiment.append("Centralities", "Values", getStoredDoublesFileName(harmonics),  "Closeness", getStoredDoublesFileName(closeness));
                             break;
                         case EPPSTEIN:
                             harmonics = ((HarmonicCentrality) centralities).harmonic;

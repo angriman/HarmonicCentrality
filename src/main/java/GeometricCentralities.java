@@ -23,7 +23,7 @@ public class GeometricCentralities {
     public static final double DEFAULT_ALPHA = 0.5D;
     private final ImmutableGraph graph;
     final double[] harmonic;
-    private final double[] closeness;
+    final double[] closeness;
     private final double[] lin;
     private final double[] exponential;
     private double alpha;

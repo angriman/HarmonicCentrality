@@ -20,8 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 class ProgressiveSampling {
     /** The graph under examination. */
     private final ImmutableGraph graph;
-    /** Progressive sampling pace. */
-    private static final double ALPHA = 0;
     /** Global progress logger. */
     private final ProgressLogger pl;
     /** Number of threads. */
@@ -52,6 +50,9 @@ class ProgressiveSampling {
     private double[] prevHarmonic;
     private double[] nextHarmonic;
     private double[] exactHarmonic;
+    private double[] prevCloseness;
+    private double[] nextCloseness;
+    private double[] exactCloseness;
     private double[] absoluteErrors;
     private double[] relativeErrors;
     private int prevSamples;
@@ -68,10 +69,14 @@ class ProgressiveSampling {
         this.randomSamples = (int) Math.max(Math.log(graph.numNodes()), this.numberOfThreads);
         this.prevHarmonic = new double[graph.numNodes()];
         this.nextHarmonic = new double[graph.numNodes()];
+        this.prevCloseness = new double[graph.numNodes()];
+        this.nextCloseness = new double[graph.numNodes()];
         this.absoluteErrors = new double[graph.numNodes()];
         this.relativeErrors = new double[graph.numNodes()];
         this.exactHarmonic = new double[graph.numNodes()];
-        Arrays.fill(this.exactHarmonic, -1);
+        this.exactCloseness = new double[graph.numNodes()];
+        Arrays.fill(this.exactHarmonic, -1.0D);
+        Arrays.fill(this.exactCloseness, -1.0D);
     }
 
     /**
@@ -189,6 +194,7 @@ class ProgressiveSampling {
 
                 //System.out.println("Iteration = " + iterations.get() + " node = " + curr + " continue until node <= " + (randomSamples + cumulatedSamples));
                 ProgressiveSampling.this.exactHarmonic[samples[curr]] = 0;
+                ProgressiveSampling.this.exactCloseness[samples[curr]] = 0;
                 queue.clear();
                 queue.enqueue(samples[curr]);
                 Arrays.fill(distance, -1);
@@ -208,7 +214,9 @@ class ProgressiveSampling {
                             visitedNodes.getAndIncrement();
                             distance[s] = d;
                             ProgressiveSampling.this.nextHarmonic[s] += hd;
+                            ProgressiveSampling.this.nextCloseness[s] += (double)d;
                             ProgressiveSampling.this.exactHarmonic[samples[curr]] += hd;
+                            ProgressiveSampling.this.exactCloseness[samples[curr]] += (double)d;
                         }
                     }
                 }
@@ -239,8 +247,15 @@ class ProgressiveSampling {
         prevSamples = cumulatedSamples;
        // randomSamples = Math.min((int) Math.ceil((1 + ALPHA) * cumulatedSamples), samples.length - cumulatedSamples);
         randomSamples = Math.min(samples.length - cumulatedSamples, randomSamples);
-       if (iterations.get() >= 10)
-            samples = (new RandomSamplesExtractor(graph)).update(cumulatedSamples, samples, nextHarmonic, iterations.get());
+       if (iterations.get() >= 10) {
+           //samples = (new RandomSamplesExtractor(graph)).update(cumulatedSamples, samples, nextHarmonic, iterations.get());
+           double[] estimatedCloseness = new double[nextCloseness.length];
+           System.arraycopy(nextCloseness, 0, estimatedCloseness, 0, nextCloseness.length);
+           for (int i = 0; i<nextCloseness.length; ++i) {
+               estimatedCloseness[i] = ((double)(graph.numNodes()) - 1) * (double)cumulatedSamples/ (estimatedCloseness[i] * (double)graph.numNodes());
+           }
+            samples = (new RandomSamplesExtractor(graph)).update(cumulatedSamples, samples, estimatedCloseness, iterations.get());
+       }
     }
 
     private boolean stoppingConditions() {
@@ -249,6 +264,8 @@ class ProgressiveSampling {
 
     private void checkPrecision() throws IOException {
         final Double[] gt = ArrayUtils.toObject((new Evaluate()).getGT());
+        final Double[] gtClos = ArrayUtils.toObject((new Evaluate()).getClos());
+
        // double[] realAbs = new double[nextHarmonic.length];
         //double[] realRel = new double[nextHarmonic.length];
         double nextNorm = normalization(true);
@@ -268,20 +285,25 @@ class ProgressiveSampling {
         JSONArray abs = new JSONArray(Arrays.toString(absoluteErrors));
         JSONArray rel = new JSONArray(Arrays.toString(relativeErrors));
         double[][] h = HarmonicCentrality.sort(nextHarmonic);
+        double[][] c = HarmonicCentrality.sort(nextCloseness);
         double[] harmonics = new double[graph.numNodes()];
+        double[] closeness = new double[graph.numNodes()];
         double[] nodes = new double[graph.numNodes()];
-
+        double[] nodesC = new double[graph.numNodes()];
         for (int i = 0; i < harmonics.length; ++i) {
             harmonics[i] = h[i][0] * normalization(true);
+            closeness[i] = ((double)graph.numNodes() - 1) / c[i][0];
             nodes[i] = h[i][1];
+            nodesC[i] = c[i][1];
         }
-
         Integer[] sortedCentralities = new Integer[graph.numNodes()];
-
+        Integer[] sortedCloseness = new Integer[graph.numNodes()];
         NodeIterator nodeIterator = graph.nodeIterator();
         int count = 0;
         while (nodeIterator.hasNext()) {
-            sortedCentralities[count++] = nodeIterator.nextInt();
+            int next = nodeIterator.nextInt();
+            sortedCloseness[count] = next;
+            sortedCentralities[count++] = next;
         }
 
         Arrays.sort(sortedCentralities, new Comparator<Integer>() {
@@ -292,11 +314,21 @@ class ProgressiveSampling {
             }
         });
 
+        Arrays.sort(sortedCloseness, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer o1, Integer o2) {
+                int first = gtClos[o2].compareTo(gtClos[o1]);
+                return (first == 0) ? o2.compareTo(o1) : first;
+            }
+        });
+
         JSONObject errors = new JSONObject();
         errors.put("Absolute", abs);
         errors.put("Relative", rel);
         errors.put("Harmonics", harmonics);
         errors.put("Nodes", nodes);
+        errors.put("Closeness", closeness);
+        errors.put("ClosenessNodes", nodesC);
         Integer[] currentSamples = new Integer[cumulatedSamples];
 
         //System.arraycopy(samples, 0, currentSamples, 0, currentSamples.length);
@@ -327,33 +359,33 @@ class ProgressiveSampling {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        int k = 10;
-        if (currentSamples.length > k) {
-            double confidence = approximationPrecision();
-
-            Integer[] topComputed = new Integer[k];
-            System.arraycopy(currentSamples, 0, topComputed, 0, k);
-            double highestEstimated = 0;
-            int index = 0;
-            for (double i : nodes) {
-                if (!Arrays.asList(topComputed).contains((int) i)) {
-                    highestEstimated = nextHarmonic[(int)i];
-                    index = (int)i;
-                    break;
-                }
-                index = (int)i;
-            }
-
-
-            double threshold = highestEstimated  + (double) graph.outdegree(index) + 0.5 * Math.max(0, (graph.numNodes() - cumulatedSamples - graph.outdegree(index)));//confidence + highestEstimated;
-            threshold /= (double)(graph.numNodes() - 1);
-            System.out.println("Highest estimated = " + threshold);
-            //System.out.println("Confidence = " + confidence);
-            System.out.println("GT = " + (gt[currentSamples[k-1]] / ((double)(graph.numNodes() - 1))));
-            if (gt[currentSamples[k-1]] / ((double)(graph.numNodes() - 1)) > threshold) {
-                System.out.println("STOP");
-            }
-        }
+      //  int k = 10;
+//        if (currentSamples.length > k) {
+//            double confidence = approximationPrecision();
+//
+//            Integer[] topComputed = new Integer[k];
+//            System.arraycopy(currentSamples, 0, topComputed, 0, k);
+//            double highestEstimated = 0;
+//            int index = 0;
+//            for (double i : nodes) {
+//                if (!Arrays.asList(topComputed).contains((int) i)) {
+//                    highestEstimated = nextHarmonic[(int)i];
+//                    index = (int)i;
+//                    break;
+//                }
+//                index = (int)i;
+//            }
+//
+//
+//            double threshold = highestEstimated  + (double) graph.outdegree(index) + 0.5 * Math.max(0, (graph.numNodes() - cumulatedSamples - graph.outdegree(index)));//confidence + highestEstimated;
+//            threshold /= (double)(graph.numNodes() - 1);
+//            System.out.println("Highest estimated = " + threshold);
+//            //System.out.println("Confidence = " + confidence);
+//            System.out.println("GT = " + (gt[currentSamples[k-1]] / ((double)(graph.numNodes() - 1))));
+//            if (gt[currentSamples[k-1]] / ((double)(graph.numNodes() - 1)) > threshold) {
+//                System.out.println("STOP");
+//            }
+//        }
         //System.out.println(approximationPrecision());
         System.arraycopy(nextHarmonic, 0, prevHarmonic, 0, nextHarmonic.length);
     }
