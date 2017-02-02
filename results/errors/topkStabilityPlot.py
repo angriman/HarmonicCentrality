@@ -121,7 +121,7 @@ plt.rc('font', **font)
 
 plt.figure(2)
 plt.grid(True)
-plt.plot(x_ax[0:len(x_ax)], stable_nodes[0:len(stable_nodes)], linewidth=3)
+plt.plot(x_ax, stable_nodes, linewidth=3)
 plt.xlabel("Computed BFSs")
 plt.ylabel("Overall stability")
 plt.show()

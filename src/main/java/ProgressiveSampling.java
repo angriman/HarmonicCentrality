@@ -56,6 +56,7 @@ class ProgressiveSampling {
     private double[] absoluteErrors;
     private double[] relativeErrors;
     private int prevSamples;
+    private int distanceLowerBound[];
 
 
     ProgressiveSampling(ImmutableGraph graph, int requestedThreads, ProgressLogger pl) {
@@ -75,6 +76,7 @@ class ProgressiveSampling {
         this.relativeErrors = new double[graph.numNodes()];
         this.exactHarmonic = new double[graph.numNodes()];
         this.exactCloseness = new double[graph.numNodes()];
+        this.distanceLowerBound = new int[graph.numNodes()];
         Arrays.fill(this.exactHarmonic, -1.0D);
         Arrays.fill(this.exactCloseness, -1.0D);
     }
@@ -171,14 +173,20 @@ class ProgressiveSampling {
     private final class ProgressiveSamplingThread implements Callable<Void> {
         private final IntArrayFIFOQueue queue;
         private final int[] distance;
+        private final int[] levels; // Diametro del grafo
+        private final int[] nodeLevel;
 
         private ProgressiveSamplingThread() {
             this.distance = new int[ProgressiveSampling.this.graph.numNodes()];
             this.queue = new IntArrayFIFOQueue();
+            this.nodeLevel = new int[ProgressiveSampling.this.graph.numNodes()];
+            this.levels = new int[8];
         }
 
         public Void call() {
             int[] distance = this.distance;
+            int[] nodeLevel = this.nodeLevel;
+            int[] levels = this.levels;
             IntArrayFIFOQueue queue = this.queue;
             ImmutableGraph graph = ProgressiveSampling.this.graph.copy();
 
@@ -198,6 +206,8 @@ class ProgressiveSampling {
                 queue.clear();
                 queue.enqueue(samples[curr]);
                 Arrays.fill(distance, -1);
+                Arrays.fill(nodeLevel, 0);
+                Arrays.fill(levels, 0);
                 distance[samples[curr]] = 0;
 
                 while (!queue.isEmpty()) {
@@ -206,6 +216,9 @@ class ProgressiveSampling {
                     double hd = 1.0D / (double) d;
                     LazyIntIterator successors = graph.successors(node);
                     int s;
+
+                    levels[d]++;
+                    nodeLevel[node] = d;
 
                     while ((s = successors.nextInt()) != -1) {
                         visitedArcs.getAndIncrement();
@@ -221,6 +234,8 @@ class ProgressiveSampling {
                     }
                 }
 
+                updateUpperBounds(levels, nodeLevel);
+
                 if (ProgressiveSampling.this.pl != null) {
                     synchronized (ProgressiveSampling.this.pl) {
                         ProgressiveSampling.this.pl.update();
@@ -228,6 +243,31 @@ class ProgressiveSampling {
                 }
             }
         }
+    }
+
+    private void updateUpperBounds(int[] levels, int[] nodelevel) {
+        for (int n = 0; n < graph.numNodes(); ++n) {
+            int curLevel = nodelevel[n];
+            int sum = 0;
+            int count = 0;
+            for (int i = 0; i < levels.length; ++i) {
+                count += levels[i];
+                sum += Math.max(1, Math.abs(i - curLevel)) * levels[i] - 1;
+            }
+            int numNodes = levels[curLevel];
+            if (curLevel > 0) {
+                numNodes += levels[curLevel-1];
+            }
+            if (curLevel < levels.length-1) {
+                numNodes += levels[curLevel+1];
+            }
+            sum += Math.max(0, numNodes - graph.outdegree(n));
+            updateVector(n, sum);
+        }
+    }
+
+    private synchronized void updateVector(int node, int sum) {
+        distanceLowerBound[node] = Math.max(distanceLowerBound[node], sum);
     }
 
     private double normalization(boolean current) {
@@ -247,25 +287,107 @@ class ProgressiveSampling {
         prevSamples = cumulatedSamples;
        // randomSamples = Math.min((int) Math.ceil((1 + ALPHA) * cumulatedSamples), samples.length - cumulatedSamples);
         randomSamples = Math.min(samples.length - cumulatedSamples, randomSamples);
-       if (iterations.get() >= 10) {
+        int degreeBatch = 1;
+        if (iterations.get() > degreeBatch) {
            //samples = (new RandomSamplesExtractor(graph)).update(cumulatedSamples, samples, nextHarmonic, iterations.get());
-           double[] estimatedCloseness = new double[nextCloseness.length];
-           System.arraycopy(nextCloseness, 0, estimatedCloseness, 0, nextCloseness.length);
-           for (int i = 0; i<nextCloseness.length; ++i) {
-               estimatedCloseness[i] = ((double)(graph.numNodes()) - 1) * (double)cumulatedSamples/ (estimatedCloseness[i] * (double)graph.numNodes());
-           }
+            double[] estimatedCloseness = new double[nextCloseness.length];
+            System.arraycopy(nextCloseness, 0, estimatedCloseness, 0, nextCloseness.length);
+            for (int i = 0; i < nextCloseness.length; ++i) {
+                estimatedCloseness[i] = 1.0D / estimatedCloseness[i]; // Other multipliers do not influence the sorting
+            }
+           // printMaxEstimatedCloseness(estimatedCloseness);
             samples = (new RandomSamplesExtractor(graph)).update(cumulatedSamples, samples, estimatedCloseness, iterations.get());
-       }
+        }
+        else {
+            System.out.println("Degree");
+        }
+    }
+
+    private void printMaxEstimatedCloseness(double[] estimated) throws IOException {
+        double max = 0;
+        for (double c : estimated) {
+            max = Math.max(max, c);
+        }
+        double n = (double) graph.numNodes();
+        max *= (double)cumulatedSamples * (n - 1) / n;
+
+        Integer[] currentSamples = new Integer[cumulatedSamples];
+        for (int i = 0; i < currentSamples.length; ++i) {
+            currentSamples[i] = samples[i];
+        }
+        final Double[] gtClos = ArrayUtils.toObject((new Evaluate()).getClos());
+        Arrays.sort(currentSamples, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer t1, Integer t2) {
+                int first = gtClos[t2].compareTo(gtClos[t2]);
+                return first == 0 ? t2.compareTo(t1) : first;
+            }
+        });
+
+        double kth = currentSamples[9];
+        int highestEstimatedNode = 0;
+
+        for (int c = 1; c < estimated.length; ++c) {
+            if (!Arrays.asList(currentSamples).contains(c)) {
+                if (estimated[c] > estimated[highestEstimatedNode]) {
+                    highestEstimatedNode = c;
+                }
+            }
+        }
+
+        int highestEst = (int)(1 / estimated[highestEstimatedNode]);
+        Integer[] succ = ArrayUtils.toObject(graph.successorArray(highestEstimatedNode));
+        int intersection = 0;
+        for (Integer i : succ) {
+            if (Arrays.asList(currentSamples).contains(i)) {
+                ++intersection;
+            }
+        }
+
+       // highestEst += (succ.length - intersection) + 2*(graph.numNodes() - cumulatedSamples - intersection);
+       // System.out.println("K-th = " + kth + "   highest estimated = " + highestEst);
     }
 
     private boolean stoppingConditions() {
         return !(maxSamplesReached || precisionReached);
     }
 
+    private void checkstop() {
+        Integer[] topk = new Integer[cumulatedSamples];
+        for (int i = 0; i < cumulatedSamples; ++i) {
+            topk[i] = (int) exactCloseness[samples[i]];
+        }
+
+        Arrays.sort(topk, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer t1, Integer t2) {
+                return t1.compareTo(t2);
+            }
+        });
+        
+        double[] topkClos = new double[topk.length];
+        
+        for (int i = 0; i < topk.length; ++i) {
+            topkClos[i] = 1.0D / (double)topk[i];
+        }
+
+        double highest = 0;
+        for (int i = cumulatedSamples; i < samples.length; ++i) {
+            int curr = samples[i];
+            double upperC = 1.0D / distanceLowerBound[curr];
+            highest = Math.max(highest, upperC);
+        }
+
+        highest *= (graph.numNodes() - 1);
+        System.out.println(topkClos[0]*(graph.numNodes() - 1) + " vs " + highest);
+    }
+
+
     private void checkPrecision() throws IOException {
         final Double[] gt = ArrayUtils.toObject((new Evaluate()).getGT());
         final Double[] gtClos = ArrayUtils.toObject((new Evaluate()).getClos());
 
+        checkstop();
        // double[] realAbs = new double[nextHarmonic.length];
         //double[] realRel = new double[nextHarmonic.length];
         double nextNorm = normalization(true);
@@ -281,7 +403,6 @@ class ProgressiveSampling {
            // realRel[i] = gt[i] == 0 ? nextHarmonic[i] * normalization(true) : Math.abs(nextHarmonic[i] * normalization(true) - gt[i]) / gt[i];
         }
 
-
         JSONArray abs = new JSONArray(Arrays.toString(absoluteErrors));
         JSONArray rel = new JSONArray(Arrays.toString(relativeErrors));
         double[][] h = HarmonicCentrality.sort(nextHarmonic);
@@ -290,12 +411,14 @@ class ProgressiveSampling {
         double[] closeness = new double[graph.numNodes()];
         double[] nodes = new double[graph.numNodes()];
         double[] nodesC = new double[graph.numNodes()];
+
         for (int i = 0; i < harmonics.length; ++i) {
             harmonics[i] = h[i][0] * normalization(true);
             closeness[i] = ((double)graph.numNodes() - 1) / c[i][0];
             nodes[i] = h[i][1];
             nodesC[i] = c[i][1];
         }
+
         Integer[] sortedCentralities = new Integer[graph.numNodes()];
         Integer[] sortedCloseness = new Integer[graph.numNodes()];
         NodeIterator nodeIterator = graph.nodeIterator();
@@ -338,14 +461,17 @@ class ProgressiveSampling {
         Arrays.sort(currentSamples, new Comparator<Integer>() {
             @Override
             public int compare(Integer t1, Integer t2) {
-                int first = gt[t2].compareTo(gt[t1]);
+                //int first = gt[t2].compareTo(gt[t1]);
+                int first = gtClos[t2].compareTo(gtClos[t1]);
                 return (first == 0) ? t2.compareTo(t1) : first;
             }
         });
 
         errors.put("CurrentExact", currentSamples);
-        errors.put("GTNodes", sortedCentralities);
-        errors.put("GT", gt);
+    //    errors.put("GTNodes", sortedCentralities);
+     //   errors.put("GT", gt);
+        errors.put("GTNodes", sortedCloseness);
+        errors.put("GT", gtClos);
        // errors.put("RealAbsolute", realAbs);
         //errors.put("RealRelative", realRel);
 
@@ -354,9 +480,10 @@ class ProgressiveSampling {
         path += Test.currentGraphName() + "/";
         Test.checkPath(path);
 
-        try (FileWriter file = new FileWriter(path+iterations.get()+".json")) {
+        try (FileWriter file = new FileWriter(path+iterations.get() +  ".json")) {
            errors.write(file);
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
       //  int k = 10;

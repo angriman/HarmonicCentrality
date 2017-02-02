@@ -37,7 +37,7 @@ public class Evaluate {
             }
         }
 
-        String groundTruthPath = "./results/Naive/wordassociation-2011/2017-01-11T15:42:47.860+01:00-89C34CBA90A22CF8C843EEEA44ABC30E66A3FA8C15E5880F7CFABE7C0CDF1531.json";
+        String groundTruthPath = "./results/Naive/wordassociation-2011/2017-01-23T16:57:19.283+01:00-798D3D153B156CD25673E93F89C443A0463AE03B1D5ADEBE06D201CFE1081320.json";
         File groundTruthFile = new File(groundTruthPath);
         Scanner scanner = new Scanner(groundTruthFile);
         JSONObject gtExperiment = new JSONObject(scanner.nextLine());
@@ -65,7 +65,7 @@ public class Evaluate {
     }
 
     double[] getGT() throws IOException {
-        String groundTruthPath = "./results/Naive/wordassociation-2011/2017-01-15T14:41:51.709+01:00-B4D3321B2FF61C3F990A5CEB0AFADDDAFAB594475D83D168DACD02458D80FB88.json";
+        String groundTruthPath = "./results/Naive/wordassociation-2011/2017-01-11T15:42:47.860+01:00-89C34CBA90A22CF8C843EEEA44ABC30E66A3FA8C15E5880F7CFABE7C0CDF1531.json";
         File groundTruthFile = new File(groundTruthPath);
         Scanner scanner = new Scanner(groundTruthFile);
         JSONObject gtExperiment = new JSONObject(scanner.nextLine());
@@ -77,7 +77,7 @@ public class Evaluate {
     }
 
     double[] getClos() throws IOException {
-        String gtPath = "./results/Naive/wordassociation-2011/2017-01-21T17:29:08.551+01:00-8B09422DE87510A975D4E16D4398A70F3D4C55261F987DCEE58D0ED04AA6C87B.json";
+        String gtPath = "./results/Naive/wordassociation-2011/2017-01-23T16:57:19.283+01:00-798D3D153B156CD25673E93F89C443A0463AE03B1D5ADEBE06D201CFE1081320.json";
         File gtFile = new File(gtPath);
         Scanner scanner = new Scanner(gtFile);
         JSONObject gtExperiment = new JSONObject(scanner.nextLine());
