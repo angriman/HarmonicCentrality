@@ -9,16 +9,7 @@ def atoi(text):
     return int(text) if text.isdigit() else text
 
 def natural_keys(text):
-    '''
-    alist.sort(key=natural_keys) sorts in human order
-    http://nedbatchelder.com/blog/200712/human_sorting.html
-    (See Toothy's implementation in the comments)
-    '''
     return [ atoi(c) for c in re.split('(\d+)', text) ]
-
-
-# Max centrality 4069.316666667301
-# Node 4587
 
 topk_perc = [0.01, 0.1, 1, 5 , 10]
 n = 0
@@ -29,18 +20,6 @@ def checkStability(sampled, prev):
 		result.append(len(set(sampled[0:cut]).intersection(set(prev[0:cut]))) / cut)
 
 	return result
-
-# def stableNodes(iteration, pool):
-# 	if iteration == len(pool)-1:
-# 		return len(pool[len(pool)-1])
-# 	s = 0
-# 	for i in range(len(pool[iteration])):
-# 		first = pool[iteration][i]
-# 		for j in range(iteration+1, len(pool)):
-# 			if not first == pool[j][i]:
-# 				return s
-# 		s += 1
-# 	return s
 
 def stableNodes(pool):
 	result = [0 for x in range(len(pool))]
@@ -119,9 +98,21 @@ plt.rc('font', **font)
 # plt.xlabel("Computed BFSs")
 # plt.ylabel("TopK stability")
 
+topkList = [10*x + 1 for x in range(200)];
+topkList[0] = 1
+with open("/home/eugenio/Downloads/net/result.json", 'r') as jfile:
+	data = json.load(jfile)
+
+nBFS = []
+for d in data:
+	if not d == None:
+		nBFS.append(d)
+
 plt.figure(2)
 plt.grid(True)
-plt.plot(x_ax, stable_nodes, linewidth=3)
+line1, = plt.plot(x_ax, stable_nodes, label="Our Algorithm", linewidth=3)
+line2, = plt.plot(nBFS, topkList, label="Crescenzi et al.", linewidth=3, linestyle='--')
+plt.legend(handles=[line1, line2], loc=2)
 plt.xlabel("Computed BFSs")
-plt.ylabel("Overall stability")
+plt.ylabel("Exact top-k closeness")
 plt.show()

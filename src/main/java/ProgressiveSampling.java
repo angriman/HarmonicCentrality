@@ -94,7 +94,7 @@ class ProgressiveSampling {
         double[] toReturn = new double[nextHarmonic.length];
         System.arraycopy(nextHarmonic, 0, toReturn, 0, nextHarmonic.length);
         double norm = (double)(graph.numNodes()) / (double)((graph.numNodes() - 1) * cumulatedSamples);
-        System.out.println(norm);
+       // System.out.println(norm);
         for (int i = 0; i < toReturn.length; ++i) {
             toReturn[i] *= norm;
         }
@@ -180,7 +180,7 @@ class ProgressiveSampling {
             this.distance = new int[ProgressiveSampling.this.graph.numNodes()];
             this.queue = new IntArrayFIFOQueue();
             this.nodeLevel = new int[ProgressiveSampling.this.graph.numNodes()];
-            this.levels = new int[8];
+            this.levels = new int[9];
         }
 
         public Void call() {
@@ -379,7 +379,7 @@ class ProgressiveSampling {
         }
 
         highest *= (graph.numNodes() - 1);
-        System.out.println(topkClos[0]*(graph.numNodes() - 1) + " vs " + highest);
+      //  System.out.println(topkClos[0]*(graph.numNodes() - 1) + " vs " + highest);
     }
 
 
@@ -387,7 +387,7 @@ class ProgressiveSampling {
         final Double[] gt = ArrayUtils.toObject((new Evaluate()).getGT());
         final Double[] gtClos = ArrayUtils.toObject((new Evaluate()).getClos());
 
-        checkstop();
+       // checkstop();
        // double[] realAbs = new double[nextHarmonic.length];
         //double[] realRel = new double[nextHarmonic.length];
         double nextNorm = normalization(true);
