@@ -2,9 +2,9 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/HarmonicCentrality.iml" filepath="$PROJECT_DIR$/.idea/modules/HarmonicCentrality.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/HarmonicCentrality_main.iml" filepath="$PROJECT_DIR$/.idea/modules/HarmonicCentrality_main.iml" group="HarmonicCentrality" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/HarmonicCentrality_test.iml" filepath="$PROJECT_DIR$/.idea/modules/HarmonicCentrality_test.iml" group="HarmonicCentrality" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Centrality.iml" filepath="$PROJECT_DIR$/.idea/modules/Centrality.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Centrality_main.iml" filepath="$PROJECT_DIR$/.idea/modules/Centrality_main.iml" group="Centrality" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Centrality_test.iml" filepath="$PROJECT_DIR$/.idea/modules/Centrality_test.iml" group="Centrality" />
     </modules>
   </component>
 </project>

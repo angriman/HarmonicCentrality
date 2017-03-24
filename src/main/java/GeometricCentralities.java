@@ -20,7 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class GeometricCentralities {
     private static final Logger LOGGER = LoggerFactory.getLogger(GeometricCentralities.class);
-    public static final double DEFAULT_ALPHA = 0.5D;
     private final ImmutableGraph graph;
     final double[] harmonic;
     final double[] closeness;

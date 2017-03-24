@@ -2,6 +2,8 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <bytecodeTargetLevel>
+      <module name="Centrality_main" target="1.7" />
+      <module name="Centrality_test" target="1.7" />
       <module name="HarmonicCentrality_main" target="1.7" />
       <module name="HarmonicCentrality_test" target="1.7" />
     </bytecodeTargetLevel>
