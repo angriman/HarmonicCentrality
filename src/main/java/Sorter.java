@@ -57,4 +57,23 @@ public class Sorter {
         });
         return ArrayUtils.toPrimitive(arr2);
     }
+
+    public int[] mergeAndSort(final int[] farness, final int[] approxFarness, int k) {
+        int n = graph.numNodes();
+        final double[] approxClos = new double[graph.numNodes()];
+        Integer[] result = new Integer[graph.numNodes()];
+        for (int i = 0; i < result.length; ++i) {
+            result[i] = i;
+            approxClos[i] = (farness[i] == 0) ? ((double)n/((double)(k*(n-1))))*approxFarness[i] : (double)(n-1)/(double)farness[i];
+        }
+        Arrays.sort(result, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer t1, Integer t2) {
+                int first = new Double(approxClos[t2]).compareTo(approxClos[t1]);
+                return first == 0 ? new Integer(t1).compareTo(t2) : first;
+            }
+        });
+
+        return ArrayUtils.toPrimitive(result);
+    }
 }

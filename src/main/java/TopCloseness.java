@@ -178,9 +178,7 @@ public class TopCloseness {
     }
 
     private void printResult() {
-        int[] curRes = new int[nextNode.get()];
-
-        System.arraycopy(topCloseness, 0, curRes, 0, nextNode.get());
+        int[] curRes = sorter.mergeAndSort(this.farness, this.approxFarness, this.nextNode.get());
         JSONArray currentResult = new JSONArray(curRes);
 
         String path = "./results/";
