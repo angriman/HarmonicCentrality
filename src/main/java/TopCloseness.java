@@ -29,8 +29,6 @@ public class TopCloseness {
     private boolean stop = false;
     /** Top Closeness Vector */
     private int[] topCloseness;
-    /** Number of top Closeness computed until now */
-    private AtomicInteger topClosenessComputed = new AtomicInteger();
     /** Farness of each node */
     private int[] farness;
     /** Farness computed from other nodes */
@@ -111,7 +109,6 @@ public class TopCloseness {
         if (pl != null) {
             pl.done();
         }
-
     }
 
     private final class ProgressiveSamplingThread implements Callable<Void> {
@@ -188,6 +185,5 @@ public class TopCloseness {
         catch (IOException e) {
             e.printStackTrace();
         }
-
     }
 }

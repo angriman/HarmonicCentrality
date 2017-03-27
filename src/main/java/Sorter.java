@@ -64,16 +64,27 @@ public class Sorter {
         Integer[] result = new Integer[graph.numNodes()];
         for (int i = 0; i < result.length; ++i) {
             result[i] = i;
-            approxClos[i] = (farness[i] == 0) ? ((double)n/((double)(k*(n-1))))*approxFarness[i] : (double)(n-1)/(double)farness[i];
+            approxClos[i] = (farness[i] == 0) ? approximateCloseness(n, k, approxFarness[i]) : closeness(n, farness[i]);
         }
         Arrays.sort(result, new Comparator<Integer>() {
             @Override
             public int compare(Integer t1, Integer t2) {
                 int first = new Double(approxClos[t2]).compareTo(approxClos[t1]);
-                return first == 0 ? new Integer(t1).compareTo(t2) : first;
+                return first == 0 ? new Integer(t2).compareTo(t1) : first;
             }
         });
 
         return ArrayUtils.toPrimitive(result);
+    }
+
+    private double approximateCloseness(int n, int k, int approximatedFarness) {
+        double dn = (double)n;
+        double dk = (double)k;
+        double f = (double)approximatedFarness;
+        return (1/f)*(dn/(dk*(dn-1)));
+    }
+
+    private double closeness(int n, int farness) {
+        return (1/(double) farness)*((double)(n-1));
     }
 }
