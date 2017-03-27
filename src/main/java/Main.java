@@ -3,6 +3,7 @@ import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.Transform;
+import it.unimi.dsi.webgraph.algo.ConnectedComponents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +40,12 @@ public class Main {
         progressLogger.displayFreeMemory = true;
         progressLogger.displayLocalSpeed = true;
         ImmutableGraph graph = (new GraphReader(graphBasename, jsapResult.getBoolean("mapped", false), jsapResult.userSpecified("expand"), progressLogger)).getGraph();
+        graph = Transform.symmetrize(graph);
         TopCloseness topCloseness = new TopCloseness(graph, progressLogger, numberOfThreads);
-
+        try {
+            topCloseness.compute();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }
