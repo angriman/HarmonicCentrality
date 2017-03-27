@@ -2,11 +2,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
-import netscape.javascript.JSObject;
-import org.apache.commons.lang.ArrayUtils;
 import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.JSONString;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -175,8 +171,6 @@ public class TopCloseness {
     }
 
     private synchronized void updateSchedule() {
-     //   int newValue = Math.min(TopCloseness.this.topClosenessComputed.get() + BATCH_SIZE, graph.numNodes());
-      //  TopCloseness.this.topClosenessComputed.getAndSet(newValue);
         if (TopCloseness.this.nextNode.get() < TopCloseness.this.topCloseness.length) {
             TopCloseness.this.topCloseness = sorter.farnessSort(TopCloseness.this.topCloseness,
                     TopCloseness.this.approxFarness, TopCloseness.this.farness, nextNode);
