@@ -26,10 +26,23 @@ public class GraphSorter {
             treeSet.add(arch);
             scanLine.close();
         }
+
         Iterator<Arch> iterator = treeSet.descendingIterator();
+        Arch first = iterator.next();
+        boolean minusOne = false;
+        if (first.getFrom() == 1) {
+            minusOne = true;
+        }
+        print(printWriter, first, minusOne);
+        printWriter.println();
+
         while(iterator.hasNext()) {
             Arch cur = iterator.next();
-            printWriter.println(cur.getFrom() + " " + cur.getTo());
+
+            print(printWriter, cur, minusOne);
+            if (iterator.hasNext()) {
+                printWriter.println();
+            }
         }
 
         //ImmutableGraph graph = ArcListASCIIGraph.loadSequential(graphName);
@@ -39,11 +52,20 @@ public class GraphSorter {
         in.close();
     }
 
+    private static void print(PrintWriter printWriter, Arch arch, boolean m) {
+
+        int from = arch.getFrom();
+        int to = arch.getTo();
+        if (m) {
+            from-=1;
+            to-=1;
+        }
+        printWriter.print(from + " " + to);
+    }
+
     private static class Arch implements Comparable<Arch> {
         private int from = 0;
         private int to = 0;
-
-        public Arch() {}
 
         public Arch(int from, int to) {
             this.from = from;
@@ -52,6 +74,8 @@ public class GraphSorter {
 
         public int getFrom() {return from;}
         public int getTo() {return to;}
+
+
 
         @Override
         public int compareTo(Arch o) {

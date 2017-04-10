@@ -4,6 +4,7 @@ import it.unimi.dsi.webgraph.ArrayListMutableGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.Transform;
 import it.unimi.dsi.webgraph.algo.ConnectedComponents;
+import org.apache.commons.lang.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +42,6 @@ public class Main {
         progressLogger.displayLocalSpeed = true;
         ImmutableGraph graph = (new GraphReader(graphBasename, jsapResult.getBoolean("mapped", false), jsapResult.userSpecified("expand"), progressLogger)).getGraph();
         graph = Transform.symmetrize(graph);
-        System.out.println("Connected Components = " + ConnectedComponents.compute(graph, 4, null).numberOfComponents);
         TopCloseness topCloseness = new TopCloseness(graph, progressLogger, numberOfThreads);
         try {
             topCloseness.compute();

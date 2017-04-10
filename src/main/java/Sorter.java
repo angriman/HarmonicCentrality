@@ -50,7 +50,7 @@ public class Sorter {
             public int compare(Integer o1, Integer o2) {
                 int first = new Integer(farness[o1]).compareTo(farness[o2]);
                 if (farness[o1] == 0 || farness[o2] == 0) {
-                    System.out.println("male   ");
+                   // System.out.println("male   ");
                 }
                 return first == 0 ? o1.compareTo(o2) : first;
             }

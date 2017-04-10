@@ -20,10 +20,6 @@ public class GraphReader {
         this.graph = graph1;
     }
 
-    public GraphReader() {
-        this.graph = null;
-    }
-
     public ImmutableGraph getGraph() {
         return this.graph;
     }
