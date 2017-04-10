@@ -38,7 +38,7 @@ public class Sorter {
 
     public int[] farnessSort(final int[] scheduledNodes, final int[] approxFarness, final int[] farness, AtomicInteger size) {
         Integer[] arr2 = ArrayUtils.toObject(scheduledNodes);
-        Arrays.sort(arr2, size.get(), scheduledNodes.length, new Comparator<Integer>() {
+        Arrays.sort(arr2, size.get(), arr2.length, new Comparator<Integer>() {
             @Override
             public int compare(Integer o1, Integer o2) {
                 return new Integer(approxFarness[o1]).compareTo(approxFarness[o2]);
@@ -55,6 +55,7 @@ public class Sorter {
                 return first == 0 ? o1.compareTo(o2) : first;
             }
         });
+
         return ArrayUtils.toPrimitive(arr2);
     }
 

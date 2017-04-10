@@ -18,7 +18,7 @@ public class TopCloseness {
     /** The graph under examination. */
     private final ImmutableGraph graph;
     /** Size of the batch */
-    private final int BATCH_SIZE;
+    private final int BATCH_SIZE = 10;
     /** Global progress logger. */
     private final ProgressLogger pl;
     /** Number of threads. */
@@ -36,14 +36,15 @@ public class TopCloseness {
     /** Sorter */
     private final Sorter sorter;
     /** Number of iterations */
-    private int iterations = 1;
+    private int iterations = 0;
+    /** Iterations without schedule update */
+    private int iterationNoUp = 0;
 
     public TopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads) {
         this.graph = graph;
         this.sorter = new Sorter(this.graph);
         this.pl = pl;
         this.numberOfThreads = (numberOfThreads) == 0 ? Runtime.getRuntime().availableProcessors() : numberOfThreads;
-        this.BATCH_SIZE = 10;
         this.topCloseness = initializeTopCentralities(new int[this.graph.numNodes()]);
         this.farness = new int[this.graph.numNodes()];
         this.approxFarness = new int[this.graph.numNodes()];
@@ -53,7 +54,7 @@ public class TopCloseness {
         for (int i = 0; i < topC.length; ++i) {
             topC[i] = i;
         }
-        return sorter.randomSort(topC);//degreeSort(topC);
+        return sorter.degreeSort(topC);
     }
 
     public void compute() throws  InterruptedException {
@@ -98,12 +99,12 @@ public class TopCloseness {
 
             printResult();
             ++iterations;
-            if (iterations >= 10) {
+            if (++iterationNoUp > BATCH_SIZE) {
+                iterationNoUp = 0;
                 updateSchedule();
             }
 
             remainingNodes = Math.max(0, remainingNodes - BATCH_SIZE);
-
         }
 
         if (pl != null) {
@@ -131,7 +132,6 @@ public class TopCloseness {
                     TopCloseness.this.nextNode.getAndDecrement();
                     return null;
                 }
-               // System.out.println(topIndex);
 
                 if (TopCloseness.this.stop || topIndex >= graph.numNodes()) {
                     TopCloseness.this.nextNode.getAndDecrement();
