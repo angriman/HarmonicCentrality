@@ -18,7 +18,7 @@ public class TopCloseness {
     /** The graph under examination. */
     private final ImmutableGraph graph;
     /** Size of the batch */
-    private final int BATCH_SIZE = 5;
+    private final int BATCH_SIZE = 1;
     /** Global progress logger. */
     private final ProgressLogger pl;
     /** Number of threads. */
@@ -128,12 +128,8 @@ public class TopCloseness {
 
             while (true) {
                 int topIndex = TopCloseness.this.nextNode.getAndIncrement();
-                if (topIndex >= BATCH_SIZE*iterations) {
-                    TopCloseness.this.nextNode.getAndDecrement();
-                    return null;
-                }
 
-                if (TopCloseness.this.stop || topIndex >= graph.numNodes()) {
+                if (topIndex >= BATCH_SIZE * iterations || TopCloseness.this.stop || topIndex >= graph.numNodes()) {
                     TopCloseness.this.nextNode.getAndDecrement();
                     return null;
                 }
@@ -169,6 +165,7 @@ public class TopCloseness {
 
     private synchronized void updateSchedule() {
         if (TopCloseness.this.nextNode.get() < TopCloseness.this.topCloseness.length) {
+            System.out.println("Updating schedule, we performed " + this.nextNode.get() + " Bfs");
             TopCloseness.this.topCloseness = sorter.farnessSort(TopCloseness.this.topCloseness,
                     TopCloseness.this.approxFarness, TopCloseness.this.farness, this.nextNode.get());
         }

@@ -42,6 +42,7 @@ public class Main {
         progressLogger.displayLocalSpeed = true;
         ImmutableGraph graph = (new GraphReader(graphBasename, jsapResult.getBoolean("mapped", false), jsapResult.userSpecified("expand"), progressLogger)).getGraph();
         graph = Transform.symmetrize(graph);
+        System.out.println("Number of SCC = " + ConnectedComponents.compute(graph, numberOfThreads, null).numberOfComponents);
         TopCloseness topCloseness = new TopCloseness(graph, progressLogger, numberOfThreads);
         try {
             topCloseness.compute();
