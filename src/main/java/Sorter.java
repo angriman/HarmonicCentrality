@@ -2,7 +2,6 @@ import it.unimi.dsi.webgraph.ImmutableGraph;
 import org.apache.commons.lang.ArrayUtils;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by Eugenio on 3/25/17.
@@ -36,16 +35,16 @@ public class Sorter {
         return ArrayUtils.toPrimitive(shuffledArray);
     }
 
-    public int[] farnessSort(final int[] scheduledNodes, final int[] approxFarness, final int[] farness, AtomicInteger size) {
+    public int[] farnessSort(final int[] scheduledNodes, final int[] approxFarness, final int[] farness, final int size) {
         Integer[] arr2 = ArrayUtils.toObject(scheduledNodes);
-        Arrays.sort(arr2, size.get(), arr2.length, new Comparator<Integer>() {
+        Arrays.sort(arr2, size, arr2.length, new Comparator<Integer>() {
             @Override
             public int compare(Integer o1, Integer o2) {
                 return new Integer(approxFarness[o1]).compareTo(approxFarness[o2]);
             }
         });
 
-        Arrays.sort(arr2, 0, size.get(), new Comparator<Integer>() {
+        Arrays.sort(arr2, 0, size, new Comparator<Integer>() {
             @Override
             public int compare(Integer o1, Integer o2) {
                 int first = new Integer(farness[o1]).compareTo(farness[o2]);

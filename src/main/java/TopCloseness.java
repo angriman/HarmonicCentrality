@@ -18,7 +18,7 @@ public class TopCloseness {
     /** The graph under examination. */
     private final ImmutableGraph graph;
     /** Size of the batch */
-    private final int BATCH_SIZE = 10;
+    private final int BATCH_SIZE = 5;
     /** Global progress logger. */
     private final ProgressLogger pl;
     /** Number of threads. */
@@ -170,7 +170,7 @@ public class TopCloseness {
     private synchronized void updateSchedule() {
         if (TopCloseness.this.nextNode.get() < TopCloseness.this.topCloseness.length) {
             TopCloseness.this.topCloseness = sorter.farnessSort(TopCloseness.this.topCloseness,
-                    TopCloseness.this.approxFarness, TopCloseness.this.farness, nextNode);
+                    TopCloseness.this.approxFarness, TopCloseness.this.farness, this.nextNode.get());
         }
     }
 
