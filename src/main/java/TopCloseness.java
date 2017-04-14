@@ -3,6 +3,7 @@ import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
 import org.json.JSONArray;
+import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -36,15 +37,16 @@ public class TopCloseness {
     /** Sorter */
     private final Sorter sorter;
     /** Number of iterations */
-    private int iterations = 0;
-    /** Iterations without schedule update */
-    private int iterationNoUp = 0;
+    private AtomicInteger iterations = new AtomicInteger();
 
     public TopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads) {
         this.graph = graph;
         this.sorter = new Sorter(this.graph);
         this.pl = pl;
-        this.numberOfThreads = (numberOfThreads) == 0 ? Runtime.getRuntime().availableProcessors() : numberOfThreads;
+        int numberOfThreads1;
+        numberOfThreads1 = (numberOfThreads) == 0 ? Runtime.getRuntime().availableProcessors() : numberOfThreads;
+        numberOfThreads1 = Math.min(numberOfThreads1, BATCH_SIZE);
+        this.numberOfThreads = numberOfThreads1;
         this.topCloseness = initializeTopCentralities(new int[this.graph.numNodes()]);
         this.farness = new int[this.graph.numNodes()];
         this.approxFarness = new int[this.graph.numNodes()];
@@ -73,7 +75,8 @@ public class TopCloseness {
 
         while (remainingNodes > 0) {
 
-            int numberOfThreads = Math.min(BATCH_SIZE, remainingNodes);
+            // Artificiale, da usare solo come debug
+            int numberOfThreads = Math.min(this.numberOfThreads, remainingNodes);
             numberOfThreads = Math.min(numberOfThreads, Runtime.getRuntime().availableProcessors());
             ExecutorService var11 = Executors.newFixedThreadPool(numberOfThreads);
             ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
@@ -98,13 +101,9 @@ public class TopCloseness {
             }
 
             printResult();
-            ++iterations;
-            if (++iterationNoUp > BATCH_SIZE) {
-                iterationNoUp = 0;
-                updateSchedule();
-            }
-
+            updateSchedule();
             remainingNodes = Math.max(0, remainingNodes - BATCH_SIZE);
+            this.iterations.set(0);
         }
 
         if (pl != null) {
@@ -122,17 +121,20 @@ public class TopCloseness {
         }
 
         public Void call() {
+
             int[] distance = this.distance;
             IntArrayFIFOQueue queue = this.queue;
             ImmutableGraph graph = TopCloseness.this.graph.copy();
 
             while (true) {
                 int topIndex = TopCloseness.this.nextNode.getAndIncrement();
-
-                if (topIndex >= BATCH_SIZE * iterations || TopCloseness.this.stop || topIndex >= graph.numNodes()) {
+                int currentIteration =  TopCloseness.this.iterations.getAndIncrement();
+                if (currentIteration >= BATCH_SIZE || TopCloseness.this.stop || topIndex >= graph.numNodes()) {
                     TopCloseness.this.nextNode.getAndDecrement();
+                    TopCloseness.this.iterations.getAndDecrement();
                     return null;
                 }
+
                 queue.clear();
                 queue.enqueue(topCloseness[topIndex]);
                 Arrays.fill(distance, -1);
@@ -165,7 +167,6 @@ public class TopCloseness {
 
     private synchronized void updateSchedule() {
         if (TopCloseness.this.nextNode.get() < TopCloseness.this.topCloseness.length) {
-            System.out.println("Updating schedule, we performed " + this.nextNode.get() + " Bfs");
             TopCloseness.this.topCloseness = sorter.farnessSort(TopCloseness.this.topCloseness,
                     TopCloseness.this.approxFarness, TopCloseness.this.farness, this.nextNode.get());
         }

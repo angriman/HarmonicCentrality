@@ -19,17 +19,17 @@ public class Sorter {
         Arrays.sort(arr2, new Comparator<Integer>() {
             @Override
             public int compare(Integer t1, Integer t2) {
-                return new Integer(graph.outdegree(t2)).compareTo(graph.outdegree(t1));
+                int first = new Integer(graph.outdegree(t2)).compareTo(graph.outdegree(t1));
+                return (first == 0) ? t1.compareTo(t2) : first;
             }
         });
+
         return ArrayUtils.toPrimitive(arr2);
     }
 
     public int[] randomSort(int[] arr) {
         List<Integer> shuffled = new ArrayList<>();
-        for (int i = 0; i < arr.length; ++i) {
-            shuffled.add(arr[i]);
-        }
+        for (int anArr : arr) {shuffled.add(anArr);}
         Collections.shuffle(shuffled);
         Integer[] shuffledArray = shuffled.toArray(new Integer[0]);
         return ArrayUtils.toPrimitive(shuffledArray);
@@ -40,7 +40,8 @@ public class Sorter {
         Arrays.sort(arr2, size, arr2.length, new Comparator<Integer>() {
             @Override
             public int compare(Integer o1, Integer o2) {
-                return new Integer(approxFarness[o1]).compareTo(approxFarness[o2]);
+                int first = new Integer(approxFarness[o1]).compareTo(approxFarness[o2]);
+                return (first == 0) ? o1.compareTo(o2) : first;
             }
         });
 
@@ -49,7 +50,7 @@ public class Sorter {
             public int compare(Integer o1, Integer o2) {
                 int first = new Integer(farness[o1]).compareTo(farness[o2]);
                 if (farness[o1] == 0 || farness[o2] == 0) {
-                   // System.out.println("male   ");
+                    System.out.println("male   ");
                 }
                 return first == 0 ? o1.compareTo(o2) : first;
             }
@@ -70,7 +71,7 @@ public class Sorter {
             @Override
             public int compare(Integer t1, Integer t2) {
                 int first = new Double(approxClos[t2]).compareTo(approxClos[t1]);
-                return first == 0 ? new Integer(t2).compareTo(t1) : first;
+                return first == 0 ? t2.compareTo(t1) : first;
             }
         });
 
