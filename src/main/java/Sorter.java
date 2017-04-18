@@ -36,6 +36,7 @@ public class Sorter {
     }
 
     public int[] farnessSort(final int[] scheduledNodes, final int[] approxFarness, final int[] farness, final int size) {
+      //  System.out.println("Size = " + size);
         Integer[] arr2 = ArrayUtils.toObject(scheduledNodes);
         Arrays.sort(arr2, size, arr2.length, new Comparator<Integer>() {
             @Override

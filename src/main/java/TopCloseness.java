@@ -19,7 +19,7 @@ public class TopCloseness {
     /** The graph under examination. */
     private final ImmutableGraph graph;
     /** Size of the batch */
-    private final int BATCH_SIZE = 1;
+    private final int BATCH_SIZE = 10;
     /** Global progress logger. */
     private final ProgressLogger pl;
     /** Number of threads. */

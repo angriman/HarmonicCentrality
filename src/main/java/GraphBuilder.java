@@ -10,8 +10,8 @@ import java.io.IOException;
  */
 public class GraphBuilder {
     public static void main(String[] args) throws IOException {
-        String graphBaseName = "./Graphs/Facebook/Facebook.txt";
+        String graphBaseName = "./Graphs/foldoc/foldoc.txt";
         ImmutableGraph graph = ArcListASCIIGraph.loadOffline(graphBaseName);
-        BVGraph.store(graph, "./Graphs/Facebook/Facebook");
+        BVGraph.store(graph, "./Graphs/foldoc/foldoc");
     }
 }

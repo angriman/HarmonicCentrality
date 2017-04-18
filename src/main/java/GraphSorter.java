@@ -11,8 +11,8 @@ import java.util.TreeSet;
  */
 public class GraphSorter {
     public static void main(String[] args) throws IOException {
-        File input = new File("./Graphs/google/google.txt");
-        File output = new File("./Graphs/google/sortedgoogle.txt");
+        File input = new File("./Graphs/foldoc/foldoc.txt");
+        File output = new File("./Graphs/foldoc/foldocsorted.txt");
         PrintWriter printWriter = new PrintWriter(output);
         Scanner in = new Scanner(input);
         TreeSet<Arch> treeSet = new TreeSet<>();
