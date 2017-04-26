@@ -59,7 +59,7 @@ public class TopCloseness {
         return sorter.degreeSort(topC);
     }
 
-    public void compute() throws  InterruptedException {
+    public void compute() throws InterruptedException {
         TopCloseness.ProgressiveSamplingThread[] thread = new TopCloseness.ProgressiveSamplingThread[this.numberOfThreads];
         for (int i = 0; i < thread.length; ++i) {
             thread[i] = new TopCloseness.ProgressiveSamplingThread();
@@ -173,7 +173,7 @@ public class TopCloseness {
     }
 
     private void printResult() {
-        int[] curRes = sorter.mergeAndSort(this.farness, this.approxFarness, this.nextNode.get());
+        int[] curRes = sorter.farnessSort(topCloseness ,approxFarness, farness, this.nextNode.get());//sorter.mergeAndSort(this.farness, this.approxFarness, this.nextNode.get());
         JSONArray currentResult = new JSONArray(curRes);
 
         String path = "./results/";

@@ -1,6 +1,7 @@
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import org.apache.commons.lang.ArrayUtils;
 
+import java.lang.reflect.Array;
 import java.util.*;
 
 /**
@@ -62,31 +63,33 @@ public class Sorter {
 
     public int[] mergeAndSort(final int[] farness, final int[] approxFarness, int k) {
         int n = graph.numNodes();
-        final double[] approxClos = new double[graph.numNodes()];
+        double[] approxClos = new double[graph.numNodes()];
         Integer[] result = new Integer[graph.numNodes()];
         for (int i = 0; i < result.length; ++i) {
             result[i] = i;
             approxClos[i] = (farness[i] == 0) ? approximateCloseness(n, k, approxFarness[i]) : closeness(n, farness[i]);
         }
+
+        final double[] finApxClos = approxClos.clone();
         Arrays.sort(result, new Comparator<Integer>() {
             @Override
             public int compare(Integer t1, Integer t2) {
-                int first = new Double(approxClos[t2]).compareTo(approxClos[t1]);
+                int first = new Double(finApxClos[t2]).compareTo(finApxClos[t1]);
                 return first == 0 ? t2.compareTo(t1) : first;
             }
         });
-
         return ArrayUtils.toPrimitive(result);
     }
+
 
     private double approximateCloseness(int n, int k, int approximatedFarness) {
         double dn = (double)n;
         double dk = (double)k;
         double f = (double)approximatedFarness;
-        return (1/f)*(dn/(dk*(dn-1)));
+        return dk * (dn - 1) / (dn*f);
     }
 
     private double closeness(int n, int farness) {
-        return (1/(double) farness)*((double)(n-1));
+        return ((double)(n-1) / ((double) farness));
     }
 }
