@@ -1,117 +1,55 @@
-import com.google.common.util.concurrent.AtomicDouble;
-import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
-import it.unimi.dsi.webgraph.LazyIntIterator;
+import it.unimi.dsi.webgraph.NodeIterator;
+import org.apache.commons.lang.ArrayUtils;
 
-import java.util.Arrays;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import static java.lang.Runtime.getRuntime;
 
 /**
- * Created by Eugenio on 4/26/17.
+ * Created by Eugenio on 4/27/17.
  */
 public class ChechikTopCloseness {
-    /** The graph under examination. */
+    /**
+     * The graph under examination.
+     */
     private final ImmutableGraph graph;
-    /** Global progress logger. */
+    /**
+     * Global progress logger.
+     */
     private final ProgressLogger pl;
-    /** Number of threads. */
-    private final int numberOfThreads;
-    private final double epsilon;
-    private AtomicDouble[] apxFarness;
-    private AtomicInteger nextNode = new AtomicInteger(0);
-    private int[] samples;
-    private double[] probabilities;
+    private final ChechikFarnessEstimator estimator;
+    private final Sorter sorter;
 
-
-    public ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, double epsilon) {
+    public ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads) {
         this.graph = graph;
         this.pl = pl;
-        this.numberOfThreads = (numberOfThreads) == 0 ? Runtime.getRuntime().availableProcessors() : numberOfThreads;
-        this.epsilon = epsilon;
-        this.apxFarness = new AtomicDouble[this.graph.numNodes()];
+        this.estimator = new ChechikFarnessEstimator(graph, pl, numberOfThreads, 0.05D);
+        this.sorter = new Sorter(this.graph);
     }
 
     public void compute() throws InterruptedException {
-        Arrays.fill(apxFarness, new AtomicDouble(0.0D));
-        ChechikEstimator estimator = new ChechikEstimator(graph, epsilon);
-        estimator.computeCoefficients();
-        samples = estimator.getSamples();
-        probabilities = estimator.getProbabilities();
-        System.out.println("S size: " + samples.length);
-        ChechikTopCloseness.ComputeApproximationThread[] thread = new ChechikTopCloseness.ComputeApproximationThread[this.numberOfThreads];
-        for (int i = 0; i < thread.length; ++i) {
-            thread[i] = new ChechikTopCloseness.ComputeApproximationThread();
+        this.estimator.compute();
+        double[] apxFarness = this.estimator.getApxFarness();
+        Integer[] nodes = new Integer[graph.numNodes()];
+        NodeIterator iterator = graph.nodeIterator();
+        int i = 0;
+        while(iterator.hasNext()) {
+            nodes[i++] = iterator.nextInt();
         }
-
-        if (this.pl != null) {
-            this.pl.start("Starting visits...");
-            this.pl.expectedUpdates = (long) graph.numNodes();
-            this.pl.itemsName = "nodes";
-        }
-
-        ExecutorService var11 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-        ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
-
-        int e = thread.length;
-
-        while (e-- != 0) { executorCompletionService.submit(thread[e]);}
-
-        try {
-            e = thread.length;
-            while (e-- != 0) { executorCompletionService.take().get(); }
-        } catch (ExecutionException var9) {
-            Throwable cause = var9.getCause();
-            throw cause instanceof RuntimeException ? (RuntimeException)cause : new RuntimeException(cause.getMessage(), cause);
-        } finally {
-            var11.shutdown();
-        }
-
-        if (this.pl != null) {
-            this.pl.done();
-        }
+        sorter.farnessSort(apxFarness, nodes);
+        System.out.println(isSorted(apxFarness) ? "Sorted" : "Not sorted");
+       // System.out.println(ArrayUtils.toString(ArrayUtils.subarray(apxFarness, 0,120)));
+        //System.out.println(ArrayUtils.toString(ArrayUtils.subarray(sorter.getTopKFromFarness(apxFarness, nodes), 10,20)));
     }
 
-    private final class ComputeApproximationThread implements Callable<Void> {
-        private final IntArrayFIFOQueue queue;
-        private final int[] distance;
-
-        private ComputeApproximationThread() {
-            this.distance = new int[ChechikTopCloseness.this.graph.numNodes()];
-            this.queue = new IntArrayFIFOQueue();
-        }
-
-        public Void call() {
-            int[] distance = this.distance;
-            IntArrayFIFOQueue queue = this.queue;
-            ImmutableGraph graph = ChechikTopCloseness.this.graph.copy();
-
-            while (true) {
-                int i = nextNode.getAndIncrement();
-                if (i >= samples.length) {
-                    return null;
-                }
-                queue.clear();
-                queue.enqueue(samples[i]);
-                Arrays.fill(distance, -1);
-                distance[samples[i]] = 0;
-
-                while (!queue.isEmpty()) { // Perform BFS and update farness
-                    int sourceNode = queue.dequeueInt();
-                    int d = distance[sourceNode] + 1;
-                    LazyIntIterator successors = graph.successors(sourceNode);
-                    int s;
-
-                    while ((s = successors.nextInt()) != -1) {
-                        if (distance[s] == -1) {
-                            queue.enqueue(s);
-                            distance[s] = d;
-                            apxFarness[s].addAndGet((double) d / probabilities[i]);
-                        }
-                    }
-                }
+    private boolean isSorted(double[] nodes) {
+        double prev = nodes[0];
+        for (int i = 1; i < nodes.length; ++i) {
+            if (nodes[i] < prev) {
+                return false;
             }
+            prev = nodes[i];
         }
+        return true;
     }
 }

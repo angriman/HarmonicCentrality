@@ -14,24 +14,24 @@ import java.util.Random;
 public class ChechikEstimator {
     private final ImmutableGraph graph;
     private double[] lambda;
-    private final int INITIAL_SET_SIZE = 2;
     private int[] distance;
     private double[] probabilities;
     private final int k;
-    private final double epsilon;
     private ArrayList<Integer> s = new ArrayList<>();
     private ArrayList<Double> sp = new ArrayList<>();
+    private boolean[] exact;
 
     public int[] getSamples() {return ArrayUtils.toPrimitive(s.toArray(new Integer[s.size()]));}
     public double[] getProbabilities() {return ArrayUtils.toPrimitive(sp.toArray(new Double[sp.size()]));}
+    public boolean[] getExact() {return exact;}
 
     public ChechikEstimator(ImmutableGraph graph, double epsilon) {
         this.graph = graph;
         this.lambda = new double[graph.numNodes()];
         this.distance = new int[graph.numNodes()];
         this.probabilities = new double[graph.numNodes()];
-        this.epsilon = epsilon;
         this.k = (int)Math.ceil(1.0D / Math.pow(epsilon, 2));
+        this.exact = new boolean[graph.numNodes()];
     }
 
     public void computeCoefficients() {
@@ -52,8 +52,10 @@ public class ChechikEstimator {
 
 
     private void updateLambda() {
+        int INITIAL_SET_SIZE = 50;
         final int[] samples = new Random().ints(0, graph.numNodes()).distinct().limit(INITIAL_SET_SIZE).toArray();
         for (int u: samples) {
+            exact[u] = true;
             int d = BFS(u);
             NodeIterator iterator = graph.nodeIterator();
             while (iterator.hasNext()) {
