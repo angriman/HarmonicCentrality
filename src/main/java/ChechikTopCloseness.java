@@ -11,12 +11,17 @@ public class ChechikTopCloseness {
     private final ImmutableGraph graph;
     private final ChechikFarnessEstimator estimator;
     private final Sorter sorter;
-    private double[] apxCloseness;
+    private static final double epsilon = 0.05D;
+    private String graphName;
 
     public ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads) {
         this.graph = graph;
-        this.estimator = new ChechikFarnessEstimator(graph, pl, numberOfThreads, 0.05D);
+        this.estimator = new ChechikFarnessEstimator(graph, pl, numberOfThreads, epsilon);
         this.sorter = new Sorter(this.graph);
+    }
+
+    public void setGraphName(String name) {
+        graphName = name;
     }
 
     public void compute() throws InterruptedException {
@@ -35,6 +40,9 @@ public class ChechikTopCloseness {
             apxCloseness[i] = (double)(graph.numNodes() - 1) / apxFarness[i];
         }
 
+        GTLoader loader = new GTLoader(graphName);
+        loader.load();
+        print(ArrayUtils.toString(ArrayUtils.subarray(loader.getCloseness(), 0, 10)));
     }
 
     private void print(String s) {

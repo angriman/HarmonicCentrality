@@ -45,6 +45,7 @@ public class Main {
         System.out.println("Number of SCCs = " + ConnectedComponents.compute(graph, numberOfThreads, null).numberOfComponents);
         ChechikTopCloseness topCloseness = new ChechikTopCloseness(graph, progressLogger, numberOfThreads);
         try {
+            topCloseness.setGraphName(graphName);
             topCloseness.compute();
         } catch (InterruptedException e) {
             e.printStackTrace();

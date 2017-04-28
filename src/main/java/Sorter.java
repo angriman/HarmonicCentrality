@@ -85,6 +85,10 @@ public class Sorter {
         Arrays.sort(nodes, (o1, o2) -> new Double(farness[o1]).compareTo(farness[o2]));
     }
 
+    public void closenessSort(double[] closeness, Integer[] nodes) {
+        Arrays.sort(nodes, (o1, o2) -> new Double(closeness[o2]).compareTo(closeness[o1]));
+    }
+
     private double approximateCloseness(int n, int k, int approximatedFarness) {
         double dn = (double)n;
         double dk = (double)k;
