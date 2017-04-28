@@ -21,7 +21,10 @@ public class ChechikEstimator {
     private ArrayList<Double> sp = new ArrayList<>();
     private boolean[] exact;
 
-    public int[] getSamples() {return ArrayUtils.toPrimitive(s.toArray(new Integer[s.size()]));}
+    public int[] getSamples() {
+        return ArrayUtils.toPrimitive(s.toArray(new Integer[s.size()]));
+    }
+
     public double[] getProbabilities() {return ArrayUtils.toPrimitive(sp.toArray(new Double[sp.size()]));}
     public boolean[] getExact() {return exact;}
 
@@ -54,7 +57,7 @@ public class ChechikEstimator {
     private void updateLambda() {
         int INITIAL_SET_SIZE = 50;
         final int[] samples = new Random().ints(0, graph.numNodes()).distinct().limit(INITIAL_SET_SIZE).toArray();
-        for (int u: samples) {
+        for (int u: samples) { // TODO parallel
             exact[u] = true;
             int d = BFS(u);
             NodeIterator iterator = graph.nodeIterator();

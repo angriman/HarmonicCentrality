@@ -32,18 +32,14 @@ public class ChechikFarnessEstimator {
      */
     private final int numberOfThreads;
     private double epsilon;
-    private AtomicDouble[] apxFarness;
+    private double[] apxFarness;
     private AtomicInteger nextNode = new AtomicInteger(0);
     private int[] samples;
     private double[] probabilities;
     private boolean[] exact;
 
     public double[] getApxFarness() {
-        double[] result = new double[graph.numNodes()];
-        for (int i = 0; i < result.length; ++i) {
-            result[i] = apxFarness[i].doubleValue();
-        }
-        return result;
+        return apxFarness;
     }
     public void setEpsilon(double epsilon) {
         this.epsilon = epsilon;
@@ -55,11 +51,11 @@ public class ChechikFarnessEstimator {
         this.pl = pl;
         this.numberOfThreads = (numberOfThreads) == 0 ? getRuntime().availableProcessors() : numberOfThreads;
         this.epsilon = epsilon;
-        this.apxFarness = new AtomicDouble[this.graph.numNodes()];
+        this.apxFarness = new double[this.graph.numNodes()];
     }
 
     public void compute() throws InterruptedException {
-        fill(apxFarness, new AtomicDouble(0.0D));
+        fill(apxFarness, 0);
         ChechikEstimator estimator = new ChechikEstimator(graph, epsilon);
         estimator.computeCoefficients();
         samples = estimator.getSamples();
@@ -124,7 +120,6 @@ public class ChechikFarnessEstimator {
 
                 int v = samples[i];
                 double p = probabilities[i];
-
                 queue.clear();
                 queue.enqueue(v);
                 exact[v] = true;
@@ -141,7 +136,7 @@ public class ChechikFarnessEstimator {
                         if (distance[s] == -1) {
                             queue.enqueue(s);
                             distance[s] = d;
-                            apxFarness[s].addAndGet(((double)d)); // p);
+                            updateFarness(s, d, p);
                         }
                     }
                 }
@@ -153,5 +148,13 @@ public class ChechikFarnessEstimator {
                 }
             }
         }
+    }
+
+    private synchronized void updateFarness(int pos, double d, double p) {
+        apxFarness[pos] += d / p;
+    }
+
+    private void print(String s) {
+        System.out.println(s);
     }
 }

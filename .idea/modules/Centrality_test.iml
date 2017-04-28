@@ -13,7 +13,6 @@
     <orderEntry type="library" name="Gradle: it.unimi.dsi:webgraph:3.5.2" level="project" />
     <orderEntry type="library" name="Gradle: org.json:json:20160810" level="project" />
     <orderEntry type="library" name="Gradle: it.unipd.dei:experiment-reporter:0.3.0" level="project" />
-    <orderEntry type="library" name="Gradle: com.google.guava:guava:21.0" level="project" />
     <orderEntry type="library" name="Gradle: junit:junit:4.11" level="project" />
     <orderEntry type="library" name="Gradle: it.unimi.dsi:fastutil:7.0.12" level="project" />
     <orderEntry type="library" name="Gradle: it.unimi.dsi:sux4j:4.0.0" level="project" />
@@ -29,6 +28,7 @@
     <orderEntry type="library" name="Gradle: commons-io:commons-io:2.4" level="project" />
     <orderEntry type="library" name="Gradle: commons-lang:commons-lang:2.6" level="project" />
     <orderEntry type="library" name="Gradle: commons-collections:commons-collections:20040616" level="project" />
+    <orderEntry type="library" name="Gradle: com.google.guava:guava:19.0" level="project" />
     <orderEntry type="library" name="Gradle: net.sf.jung:jung-algorithms:2.1" level="project" />
     <orderEntry type="library" name="Gradle: commons-logging:commons-logging:1.1.1" level="project" />
     <orderEntry type="library" name="Gradle: org.slf4j:slf4j-api:1.7.21" level="project" />

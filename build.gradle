@@ -27,5 +27,4 @@ dependencies {
     compile 'it.unimi.dsi:webgraph:3.5.2'
     compile group: 'org.json', name: 'json', version: '20160810'
     compile 'it.unipd.dei:experiment-reporter:0.3.0'
-    compile 'com.google.guava:guava:21.0'
 }
