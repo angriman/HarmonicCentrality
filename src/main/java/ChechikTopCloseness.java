@@ -3,6 +3,8 @@ import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.NodeIterator;
 import org.apache.commons.lang.ArrayUtils;
 
+import java.io.IOException;
+
 /**
  * Created by Eugenio on 4/27/17.
  */
@@ -40,9 +42,12 @@ public class ChechikTopCloseness {
             apxCloseness[i] = (double)(graph.numNodes() - 1) / apxFarness[i];
         }
 
-        GTLoader loader = new GTLoader(graphName);
-        loader.load();
-        print(ArrayUtils.toString(ArrayUtils.subarray(loader.getCloseness(), 0, 10)));
+        GTLoader loader = new GTLoader(graphName, graph.numNodes());
+        try {
+            loader.load();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void print(String s) {
