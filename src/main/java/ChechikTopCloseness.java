@@ -5,6 +5,7 @@ import it.unimi.dsi.webgraph.LazyIntIterator;
 import it.unimi.dsi.webgraph.NodeIterator;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.TreeSet;
 
 /**
@@ -21,7 +22,6 @@ public class ChechikTopCloseness {
     private double[] apxCloseness;
     private Integer[] nodes;
     private int[] distance;
-    private Integer[] topk;
     private TreeSet<Integer> topC;
 
     public ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, int k) {
@@ -33,19 +33,18 @@ public class ChechikTopCloseness {
     }
 
     public Integer[] getTopk() {
-        /*for (int i = 0; i < k; ++i) {
-            this.topk[i] = topC.first();
-            topC.remove(topC.first());
-        }
+        /*TreeSet<Integer> toReturn = new TreeSet<>(topC.comparator());
         int i = 0;
-        Integer cur;
-        while ((cur = topC.first()) == apxCloseness[topk[k-1]]) {
-            topk[k+i] = cur;
-            ++i;
-            topC.remove(cur);
+        while (!topC.isEmpty()) {
+            if (i >= k && topC.first() < toReturn.last()) {
+                break;
+            }
+            Integer first = topC.first();
+            toReturn.add(first);
+            topC.remove(first);
         }
-        return (Integer[]) ArrayUtils.subarray(topk, 0, k+i);*/
-        return this.topk;
+        return topC.toArray(new Integer[toReturn.size()]);*/
+        return topC.toArray(new Integer[topC.size()]);
     }
 
     public void compute() throws InterruptedException {
@@ -73,16 +72,15 @@ public class ChechikTopCloseness {
 
     private void computeTopKSet(int to) {
         double limit = (1.0D + epsilon)*apxCloseness[nodes[to]];
-        int end = to;
-        while (apxCloseness[end] >= limit && end < graph.numNodes() - 1) {
-            System.out.println(limit + " <= " + apxCloseness[end]);
-            ++end;
+        topC = new TreeSet<>((o1, o2) -> {
+            int first = new Double(apxCloseness[o2]).compareTo(apxCloseness[o1]);
+            return (first == 0) ? o1.compareTo(o2) : first;
+        });
+        for (int x = 0; x < to; x++) {
+            topC.add(nodes[x]);
         }
-
-        this.topk = new Integer[end];
-        System.arraycopy(nodes, 0, topk, 0, topk.length);
     }
-
+/*
     private void completeTopCloseness() {
         topC = new TreeSet<>((o1, o2) -> new Double(apxCloseness[o2]).compareTo(apxCloseness[o1]));
         for (Integer v : this.topk) {
@@ -91,7 +89,7 @@ public class ChechikTopCloseness {
             }
             topC.add(v);
         }
-    }
+    }*/
 
     private void computeRemainingCloseness(int to) {
         for (int i = 0; i < to; ++i) {
@@ -103,9 +101,9 @@ public class ChechikTopCloseness {
     }
 
     private int getKth() {
-        double kth = apxCloseness[nodes[k-1]];
+        double kth = apxCloseness[nodes[k-1]]*(1.0D-epsilon);
         int to = k;
-        while (to < graph.numNodes() && kth <= apxCloseness[nodes[k]]) {
+        while (to < graph.numNodes() && apxCloseness[nodes[to]] >= kth) {
             ++to;
         }
         return to;
