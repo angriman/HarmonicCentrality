@@ -20,10 +20,15 @@ public class ChechikEstimator {
     private ArrayList<Integer> s = new ArrayList<>();
     private ArrayList<Double> sp = new ArrayList<>();
     private boolean[] exact;
+    private int numberOfBFS = 0;
+    private int[] farness;
 
     public int[] getSamples() {
         return ArrayUtils.toPrimitive(s.toArray(new Integer[s.size()]));
     }
+    public int[] getFarness() {return farness;}
+
+    public int getNumberOfBFS() {return numberOfBFS;}
 
     public double[] getProbabilities() {return ArrayUtils.toPrimitive(sp.toArray(new Double[sp.size()]));}
     public boolean[] getExact() {return exact;}
@@ -35,6 +40,7 @@ public class ChechikEstimator {
         this.probabilities = new double[graph.numNodes()];
         this.k = (int)Math.ceil(1.0D / Math.pow(epsilon, 2));
         this.exact = new boolean[graph.numNodes()];
+        this.farness = new int[graph.numNodes()];
     }
 
     public void computeCoefficients() {
@@ -55,7 +61,8 @@ public class ChechikEstimator {
 
 
     private void updateLambda() {
-        int INITIAL_SET_SIZE = 50;
+        int INITIAL_SET_SIZE = 10;
+        numberOfBFS = INITIAL_SET_SIZE;
         final int[] samples = new Random().ints(0, graph.numNodes()).distinct().limit(INITIAL_SET_SIZE).toArray();
         for (int u: samples) { // TODO parallel
             exact[u] = true;
@@ -85,6 +92,7 @@ public class ChechikEstimator {
                     queue.enqueue(s);
                     distance[s] = d;
                     total_distance += d;
+                    farness[source] += d;
                 }
             }
         }

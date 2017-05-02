@@ -37,10 +37,24 @@ public class ChechikFarnessEstimator {
     private int[] samples;
     private double[] probabilities;
     private boolean[] exact;
+    private int numberOfBFS = 0;
+    private int[] farness;
 
     public double[] getApxFarness() {
+        for (int i = 0; i < graph.numNodes(); ++i) {
+            if (exact[i]) {
+                apxFarness[i] = (double)farness[i];
+            }
+        }
         return apxFarness;
     }
+
+    public int[] getFarness() {return farness;}
+
+    public int getNumberOfThreads() {return numberOfBFS;}
+
+    public boolean[] getExact() {return exact;}
+
     public void setEpsilon(double epsilon) {
         this.epsilon = epsilon;
     }
@@ -61,6 +75,9 @@ public class ChechikFarnessEstimator {
         samples = estimator.getSamples();
         probabilities = estimator.getProbabilities();
         exact = estimator.getExact();
+        numberOfBFS = estimator.getNumberOfBFS();
+        numberOfBFS += samples.length;
+        this.farness = estimator.getFarness();
         ChechikFarnessEstimator.ComputeApproximationThread[] thread = new ChechikFarnessEstimator.ComputeApproximationThread[this.numberOfThreads];
         for (int i = 0; i < thread.length; ++i) {
             thread[i] = new ChechikFarnessEstimator.ComputeApproximationThread();
@@ -136,7 +153,7 @@ public class ChechikFarnessEstimator {
                         if (distance[s] == -1) {
                             queue.enqueue(s);
                             distance[s] = d;
-                            updateFarness(s, d, p);
+                            updateApxFarness(v, s, d, p);
                         }
                     }
                 }
@@ -150,9 +167,11 @@ public class ChechikFarnessEstimator {
         }
     }
 
-    private synchronized void updateFarness(int pos, double d, double p) {
-        apxFarness[pos] += d / p;
+    private synchronized void updateApxFarness(int source, int dest, double d, double p) {
+        apxFarness[dest] += d / p;
+        farness[source] += d;
     }
+
 
     private void print(String s) {
         System.out.println(s);

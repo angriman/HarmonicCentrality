@@ -9,6 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Created by Eugenio on 3/24/17.
@@ -27,6 +31,7 @@ public class Main {
                         new Switch("mapped", 'm', "mapped", "Use loadMapped() to load the graph."),
                         new FlaggedOption("threads", JSAP.INTSIZE_PARSER, "0", false, 'T', "threads", "The number of threads to be used. If 0, the number will be estimated automatically."),
                         new UnflaggedOption("graphBasename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The basename of the graph."),
+                        new UnflaggedOption("k", JSAP.INTSIZE_PARSER, JSAP.NO_DEFAULT, true, false, "The number of top closeness centralities to be computed."),
                 });
 
         JSAPResult jsapResult = jsap.parse(args);
@@ -37,16 +42,32 @@ public class Main {
         String graphName = jsapResult.getString("graphBasename");
         String graphBasename = "./Graphs/" + graphName + "/" + graphName;
         int numberOfThreads = jsapResult.getInt("threads");
+        int k = jsapResult.getInt("k");
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
         progressLogger.displayFreeMemory = true;
         progressLogger.displayLocalSpeed = true;
         ImmutableGraph graph = (new GraphReader(graphBasename, jsapResult.getBoolean("mapped", false), jsapResult.userSpecified("expand"), progressLogger)).getGraph();
         graph = Transform.symmetrize(graph);
         System.out.println("Number of SCCs = " + ConnectedComponents.compute(graph, numberOfThreads, null).numberOfComponents);
-        ChechikTopCloseness topCloseness = new ChechikTopCloseness(graph, progressLogger, numberOfThreads);
+        ChechikTopCloseness topCloseness = new ChechikTopCloseness(graph, progressLogger, numberOfThreads, k);
         try {
-            topCloseness.setGraphName(graphName);
             topCloseness.compute();
+            GTLoader loader = new GTLoader(graphName, graph.numNodes());
+            try {
+                loader.load();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            Integer[] computed_top_k = topCloseness.getTopk();
+            int[] exact  = loader.getTopKNodes(k);
+            Set<Integer> s1 = new HashSet<>(Arrays.asList(computed_top_k));
+            Set<Integer> s2 = new HashSet<>(Arrays.asList(ArrayUtils.toObject(exact)));
+            s1.retainAll(s2);
+
+            Integer[] result = s1.toArray(new Integer[s1.size()]);
+            System.out.println(ArrayUtils.toString(computed_top_k));
+            System.out.println(ArrayUtils.toString(exact));
+            System.out.println("Precision = " + (double)result.length/ (double)s2.size());
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

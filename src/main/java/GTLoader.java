@@ -47,6 +47,15 @@ public class GTLoader {
         }
     }
 
+    public int[] getTopKNodes(int k) {
+        int to = k;
+        double kth = closeness[k-1];
+        while (to < numNodes && closeness[to] == kth) {
+            ++to;
+        }
+        return ArrayUtils.subarray(nodes, 0, to);
+    }
+
     public double[] getCloseness() {
         return closeness;   
     }
