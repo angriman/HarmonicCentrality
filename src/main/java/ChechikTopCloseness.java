@@ -23,6 +23,7 @@ public class ChechikTopCloseness {
     private Integer[] nodes;
     private int[] distance;
     private TreeSet<Integer> topC;
+    private int numberOfBFS;
 
     public ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, int k) {
         this.graph = graph;
@@ -47,6 +48,8 @@ public class ChechikTopCloseness {
         return topC.toArray(new Integer[topC.size()]);
     }
 
+    public int getNumberOfBFS() {return numberOfBFS;}
+
     public void compute() throws InterruptedException {
         this.estimator.compute();
         this.exact = this.estimator.getExact();
@@ -65,9 +68,9 @@ public class ChechikTopCloseness {
         }
 
         int to = getKth();
+        numberOfBFS = estimator.getNumberOfThreads();
         computeRemainingCloseness(to);
         computeTopKSet(to);
-       // completeTopCloseness();
     }
 
     private void computeTopKSet(int to) {
@@ -76,32 +79,22 @@ public class ChechikTopCloseness {
             int first = new Double(apxCloseness[o2]).compareTo(apxCloseness[o1]);
             return (first == 0) ? o1.compareTo(o2) : first;
         });
-        for (int x = 0; x < to; x++) {
-            topC.add(nodes[x]);
-        }
+
+        topC.addAll(Arrays.asList(nodes).subList(0, to));
     }
-/*
-    private void completeTopCloseness() {
-        topC = new TreeSet<>((o1, o2) -> new Double(apxCloseness[o2]).compareTo(apxCloseness[o1]));
-        for (Integer v : this.topk) {
-            if (!exact[v]) {
-                apxCloseness[v] = (double)(graph.numNodes()-1) / (double)BFS(v);
-            }
-            topC.add(v);
-        }
-    }*/
 
     private void computeRemainingCloseness(int to) {
         for (int i = 0; i < to; ++i) {
             int v = nodes[i];
             if (!exact[v]) { // BFS not computed
                 apxCloseness[v] = (double)(graph.numNodes()-1) / (double)BFS(v);
+                ++numberOfBFS;
             }
         }
     }
 
     private int getKth() {
-        double kth = apxCloseness[nodes[k-1]]*(1.0D-epsilon);
+        double kth = apxCloseness[nodes[k-1]] * (1.0D-epsilon);
         int to = k;
         while (to < graph.numNodes() && apxCloseness[nodes[to]] >= kth) {
             ++to;
@@ -129,7 +122,7 @@ public class ChechikTopCloseness {
                 }
             }
         }
-       // exact[source] = true;
+        exact[source] = true;
         return total_distance;
     }
 
