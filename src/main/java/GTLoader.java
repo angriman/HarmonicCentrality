@@ -22,11 +22,6 @@ public class GTLoader {
     private final int numNodes;
     private double[] closeness;
     
-    public GTLoader() {
-        graphName = "";
-        numNodes = 0;
-    }
-    
     public GTLoader(String graphName, int numNodes) {
         this.graphName = graphName;
         this.numNodes = numNodes;
@@ -49,8 +44,8 @@ public class GTLoader {
 
     public int[] getTopKNodes(int k) {
         int to = k;
-        double kth = closeness[k-1];
-        while (to < numNodes && closeness[to] == kth) {
+        double kth = closeness[nodes[k-1]];
+        while (to < numNodes && closeness[nodes[to]] == kth) {
             ++to;
         }
         return ArrayUtils.subarray(nodes, 0, to);

@@ -17,12 +17,9 @@ public class Sorter {
 
     public int[] degreeSort(int[] arr) {
         Integer[] arr2 = ArrayUtils.toObject(arr);
-        Arrays.sort(arr2, new Comparator<Integer>() {
-            @Override
-            public int compare(Integer t1, Integer t2) {
-                int first = new Integer(graph.outdegree(t2)).compareTo(graph.outdegree(t1));
-                return (first == 0) ? t1.compareTo(t2) : first;
-            }
+        Arrays.sort(arr2, (t1, t2) -> {
+            int first = new Integer(graph.outdegree(t2)).compareTo(graph.outdegree(t1));
+            return (first == 0) ? t1.compareTo(t2) : first;
         });
 
         return ArrayUtils.toPrimitive(arr2);
@@ -39,23 +36,17 @@ public class Sorter {
     public int[] farnessSort(final int[] scheduledNodes, final int[] approxFarness, final int[] farness, final int size) {
       //  System.out.println("Size = " + size);
         Integer[] arr2 = ArrayUtils.toObject(scheduledNodes);
-        Arrays.sort(arr2, size, arr2.length, new Comparator<Integer>() {
-            @Override
-            public int compare(Integer o1, Integer o2) {
-                int first = new Integer(approxFarness[o1]).compareTo(approxFarness[o2]);
-                return (first == 0) ? o1.compareTo(o2) : first;
-            }
+        Arrays.sort(arr2, size, arr2.length, (o1, o2) -> {
+            int first = new Integer(approxFarness[o1]).compareTo(approxFarness[o2]);
+            return (first == 0) ? o1.compareTo(o2) : first;
         });
 
-        Arrays.sort(arr2, 0, size, new Comparator<Integer>() {
-            @Override
-            public int compare(Integer o1, Integer o2) {
-                int first = new Integer(farness[o1]).compareTo(farness[o2]);
-                if (farness[o1] == 0 || farness[o2] == 0) {
-                    System.out.println("male   ");
-                }
-                return first == 0 ? o1.compareTo(o2) : first;
+        Arrays.sort(arr2, 0, size, (o1, o2) -> {
+            int first = new Integer(farness[o1]).compareTo(farness[o2]);
+            if (farness[o1] == 0 || farness[o2] == 0) {
+                System.out.println("male   ");
             }
+            return first == 0 ? o1.compareTo(o2) : first;
         });
 
         return ArrayUtils.toPrimitive(arr2);
@@ -71,12 +62,9 @@ public class Sorter {
         }
 
         final double[] finApxClos = approxClos.clone();
-        Arrays.sort(result, new Comparator<Integer>() {
-            @Override
-            public int compare(Integer t1, Integer t2) {
-                int first = new Double(finApxClos[t2]).compareTo(finApxClos[t1]);
-                return first == 0 ? t2.compareTo(t1) : first;
-            }
+        Arrays.sort(result, (t1, t2) -> {
+            int first = new Double(finApxClos[t2]).compareTo(finApxClos[t1]);
+            return first == 0 ? t2.compareTo(t1) : first;
         });
         return ArrayUtils.toPrimitive(result);
     }

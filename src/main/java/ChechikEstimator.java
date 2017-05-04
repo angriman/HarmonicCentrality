@@ -92,11 +92,15 @@ public class ChechikEstimator {
                     queue.enqueue(s);
                     distance[s] = d;
                     total_distance += d;
-                    farness[source] += d;
+                    updateFarness(s, d);
                 }
             }
         }
         return total_distance;
+    }
+
+    private synchronized void updateFarness(int source, int d) {
+        farness[source] += d;
     }
 
     private void computeProbabilities() {

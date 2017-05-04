@@ -20,8 +20,7 @@ public class ExactCloseness {
         String grapName = "wordassociation-2011";
         String graphBasename = "./Graphs/" + grapName + "/" + grapName;
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
-        progressLogger.displayFreeMemory = true;
-        progressLogger.displayLocalSpeed = true;
+        progressLogger.displayFreeMemory = progressLogger.displayLocalSpeed = true;
         ImmutableGraph graph = (new GraphReader(graphBasename, true, true, progressLogger)).getGraph();
         graph = Transform.symmetrize(graph);
         GeometricCentralities geo = new GeometricCentralities(graph, progressLogger);
@@ -31,6 +30,7 @@ public class ExactCloseness {
         catch (InterruptedException e) {
             e.printStackTrace();
         }
+
         Sorter sorter = new Sorter(graph);
         Integer[] nodes = new Integer[graph.numNodes()];
         for (int i = 0; i < nodes.length; ++i) {
@@ -40,7 +40,7 @@ public class ExactCloseness {
         sorter.closenessSort(geo.closeness, nodes);
 
         for (int i = 0; i < nodes.length; ++i) {
-            closeness[i] = geo.closeness[nodes[i]];
+            closeness[i] = geo.closeness[i];
         }
 
         String path = "./Ground Truth/"+ grapName+".json";

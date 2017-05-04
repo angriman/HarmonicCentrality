@@ -1,17 +1,17 @@
-import com.google.common.util.concurrent.AtomicDouble;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
-import org.apache.commons.lang.ArrayUtils;
 
+import java.io.IOException;
 import java.util.Arrays;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Runtime.getRuntime;
-import static java.lang.System.console;
-import static java.lang.System.out;
 import static java.util.Arrays.fill;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
@@ -39,33 +39,30 @@ public class ChechikFarnessEstimator {
     private boolean[] exact;
     private int numberOfBFS = 0;
     private int[] farness;
+    private GTLoader loader;
 
-    public double[] getApxFarness() {
-        for (int i = 0; i < graph.numNodes(); ++i) {
-            if (exact[i]) {
-                apxFarness[i] = (double)farness[i];
-            }
-        }
-        return apxFarness;
-    }
+    public double[] getApxFarness() {return apxFarness;}
 
     public int[] getFarness() {return farness;}
 
-    public int getNumberOfThreads() {return numberOfBFS;}
+    public int getNumberOfBFS() {return numberOfBFS;}
 
     public boolean[] getExact() {return exact;}
 
-    public void setEpsilon(double epsilon) {
-        this.epsilon = epsilon;
-    }
+    public void setEpsilon(double epsilon) {this.epsilon = epsilon;}
 
-
-    public ChechikFarnessEstimator(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, double epsilon) {
+    public ChechikFarnessEstimator(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, double epsilon, String graphName) {
         this.graph = graph;
         this.pl = pl;
         this.numberOfThreads = (numberOfThreads) == 0 ? getRuntime().availableProcessors() : numberOfThreads;
         this.epsilon = epsilon;
         this.apxFarness = new double[this.graph.numNodes()];
+        this.loader = new GTLoader(graphName, graph.numNodes());
+        try {
+            loader.load();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void compute() throws InterruptedException {
@@ -130,33 +127,41 @@ public class ChechikFarnessEstimator {
             ImmutableGraph graph = ChechikFarnessEstimator.this.graph.copy();
 
             while (true) {
-                int i = nextNode.getAndIncrement();
+                int i = ChechikFarnessEstimator.this.nextNode.getAndIncrement();
                 if (i >= samples.length) {
                     return null;
                 }
 
                 int v = samples[i];
                 double p = probabilities[i];
+
                 queue.clear();
                 queue.enqueue(v);
-                exact[v] = true;
-                fill(distance, -1);
+                Arrays.fill(distance, -1);
                 distance[v] = 0;
 
-                while (!queue.isEmpty()) {
-                    int sourceNode = queue.dequeueInt();
-                    int d = distance[sourceNode] + 1;
-                    LazyIntIterator successors = graph.successors(sourceNode);
-                    int s;
+                while(!queue.isEmpty()) {
+                    int node = queue.dequeueInt();
+                    int d = distance[node] + 1;
+                    LazyIntIterator successors = graph.successors(node);
 
-                    while ((s = successors.nextInt()) != -1) {
-                        if (distance[s] == -1) {
+                    int s;
+                    while((s = successors.nextInt()) != -1) {
+                        if(distance[s] == -1) {
                             queue.enqueue(s);
                             distance[s] = d;
                             updateApxFarness(v, s, d, p);
                         }
                     }
                 }
+
+                exact[v] = true;
+
+              /*  double correctClos = loader.getCloseness()[v];
+                double computedClos = 1.0D / (double) farness[v];
+                if (!(correctClos == computedClos)) {
+                    System.out.println("Error " + correctClos + " vs " + computedClos+"\nNode = " + v);
+                }*/
 
                 if (ChechikFarnessEstimator.this.pl != null) {
                     synchronized (ChechikFarnessEstimator.this.pl) {
@@ -168,8 +173,8 @@ public class ChechikFarnessEstimator {
     }
 
     private synchronized void updateApxFarness(int source, int dest, double d, double p) {
+        farness[source] += (double) d;
         apxFarness[dest] += d / p;
-        farness[source] += d;
     }
 
 
