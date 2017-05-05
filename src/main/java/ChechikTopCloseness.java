@@ -24,6 +24,7 @@ public class ChechikTopCloseness {
     private TreeSet<Integer> topC;
     private int numberOfBFS;
     private int[] farness;
+    private TreeSet<Integer> toReturnTopK;
 
     public ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, int k, String graphName) {
         this.graph = graph;
@@ -31,6 +32,11 @@ public class ChechikTopCloseness {
         this.sorter = new Sorter(this.graph);
         this.k = k;
         this.distance = new int[graph.numNodes()];
+        topC = new TreeSet<>((o1, o2) -> {
+            int first = new Double(apxCloseness[o2]).compareTo(apxCloseness[o1]);
+            return first == 0 ? o1.compareTo(o2) : first;
+        });
+        toReturnTopK = new TreeSet<>(topC.comparator());
     }
 
     public int[] getFarness() {return this.farness;}
@@ -54,7 +60,8 @@ public class ChechikTopCloseness {
 
         }
         return toReturn.toArray(new Integer[toReturn.size()]);*/
-       return topC.toArray(new Integer[topC.size()]);
+      // return topC.toArray(new Integer[topC.size()]);
+        return toReturnTopK.toArray(new Integer[toReturnTopK.size()]);
     }
 
     public double[] getApxCloseness() {return apxCloseness;}
@@ -78,43 +85,21 @@ public class ChechikTopCloseness {
             apxCloseness[i] = 1.0D / apxFarness[i];
         }
 
-        int to = getKth();
         numberOfBFS = estimator.getNumberOfBFS();
-        computeRemainingCloseness(to);
-        computeTopKSet(to);
-    }
-
-    private void computeTopKSet(int to) {
-       // double limit = (1.0D + epsilon) * apxCloseness[nodes[to-1]];
-        topC = new TreeSet<>((o1, o2) -> {
-            int first = new Double(apxCloseness[o2]).compareTo(apxCloseness[o1]);
-            return (first == 0) ? o1.compareTo(o2) : first;
-        });
-
-     //   int i = 0;
-       // System.out.println("Limit = " + limit + "\nFirst = "  + apxCloseness[nodes[to-1]]);
-       /* while (apxCloseness[nodes[i]] >= limit && i < to) {
-            topC.add((int) apxCloseness[nodes[i++]]);
-        }*/
-       // System.out.println("k = " + k + " and TopC size = " + topC.size());
-        for (int i = 0; i < to; ++i) {
-            Integer next = nodes[i];
-            if (topC.size() >= k) {
-                if (apxCloseness[topC.last()] < apxCloseness[next]) {
-                    topC.pollLast();
-                    topC.add(next);
-                }
-            }
-            else {
-                topC.add(next);
-            }
+        int to = k;
+        int from = 0;
+        while (toReturnTopK.size() < k) {
+            computeRemainingCloseness(from, to);
+            double limit = limit(to-1);
+            updateTopK(limit);
+            from = to;
+            ++to;
         }
-       // topC.addAll(Arrays.asList(nodes).subList(0, to));
     }
 
-    private void computeRemainingCloseness(int to) {
+    private void computeRemainingCloseness(int from, int to) {
         this.farness = estimator.getFarness();
-        for (int i = 0; i < to; ++i) {
+        for (int i = from; i < to; ++i) {
             int v = nodes[i];
             if (!exact[v]) { // BFS not computed
                 apxCloseness[v] = 1.0D / (double)BFS(v);
@@ -124,35 +109,16 @@ public class ChechikTopCloseness {
                 if (farness[v] == 0 || !exact[v]) {System.out.println("Error!"); System.exit(1);}
                 apxCloseness[v] = 1.0D / (double)farness[v];
             }
+            topC.add(v);
         }
     }
 
-    private int getKth() {
-        /*double kth = apxCloseness[nodes[k-1]] * ((exact[nodes[k - 1]]) ? 1.0D : (1.0D - epsilon));
-        int to = k;
-        while (to < graph.numNodes() && apxCloseness[nodes[to]]*(1.0D + epsilon) >= kth) {
-            ++to;
-        }*/
-       // return to;
-        //return k+1;
-        int to = k-1;
-        double limit = limit(to);
-        int index = computeIndex(0, limit);
-        while (to < graph.numNodes() && index <= k) {
-            ++to;
-            limit = limit(to);
-            index = computeIndex(index, limit);
+    private void updateTopK(double limit) {
+        while (apxCloseness[topC.first()] >= limit && !topC.isEmpty()) {
+            toReturnTopK.add(topC.pollFirst());
         }
-       // System.out.println("K = " + k + " to = " + to);
-        return to;
     }
 
-    private int computeIndex(int from, double limit) {
-        while (apxCloseness[nodes[from]] >= limit && from < graph.numNodes()) {
-            ++from;
-        }
-        return from;
-    }
 
     private double limit(int x) {
         return (1.0D + epsilon) * apxCloseness[nodes[x]];

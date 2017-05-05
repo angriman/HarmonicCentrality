@@ -82,7 +82,7 @@ public class Main {
                 computed_set.retainAll(exact_set);
                 //exact_set.retainAll(computed_set);
 
-                double precision = (double) computed_set.size() / size;
+                double precision = (double) computed_set.size() / k;
                 if (precision != 1.0D) {
                     correct = false;
                 }
