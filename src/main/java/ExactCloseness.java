@@ -17,7 +17,7 @@ public class ExactCloseness {
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) throws IOException {
-        String grapName = "wordassociation-2011";
+        String grapName = "foldoc";
         String graphBasename = "./Graphs/" + grapName + "/" + grapName;
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
         progressLogger.displayFreeMemory = progressLogger.displayLocalSpeed = true;

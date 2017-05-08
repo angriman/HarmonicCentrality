@@ -52,13 +52,13 @@ public class Main {
         ImmutableGraph graph = (new GraphReader(graphBasename, jsapResult.getBoolean("mapped", false), jsapResult.userSpecified("expand"), progressLogger)).getGraph();
         graph = Transform.symmetrize(graph);
         //System.out.println("Number of SCCs = " + ConnectedComponents.compute(graph, numberOfThreads, null).numberOfComponents);
-        int[] topk = new int[100];
+        int[] topk = new int[10];
         topk[0] = 1;
         for (int i = 1; i < topk.length; ++i) {
-            topk[i] = 20 * i;
+            topk[i] = 50 * i;
         }
         boolean correct = true;
-        String resultPath = "./results/chechikResult.json";
+        String resultPath = "./results/" + graphName + "_chechik" + ".json";
         JSONObject obj = new JSONObject();
         for (int k : topk) {
             ChechikTopCloseness topCloseness = new ChechikTopCloseness(graph, progressLogger, numberOfThreads, k, graphName);

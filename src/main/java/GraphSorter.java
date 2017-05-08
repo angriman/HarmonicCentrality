@@ -11,8 +11,9 @@ import java.util.TreeSet;
  */
 public class GraphSorter {
     public static void main(String[] args) throws IOException {
-        File input = new File("./Graphs/foldoc/foldoc.txt");
-        File output = new File("./Graphs/foldoc/foldocsorted.txt");
+        String graphName = "wordassociation-2011";
+        File input = new File("./Graphs/"+graphName+"/"+graphName+".txt");
+        File output = new File("./Graphs/"+graphName+"/"+graphName+".txt");
         PrintWriter printWriter = new PrintWriter(output);
         Scanner in = new Scanner(input);
         TreeSet<Arch> treeSet = new TreeSet<>();
