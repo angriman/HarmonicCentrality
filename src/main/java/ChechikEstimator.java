@@ -9,7 +9,7 @@ import java.util.Arrays;
 import java.util.Random;
 
 /**
- * Created by Eugenio on 4/26/17.
+ * Wrote by Eugenio on 4/26/17.
  */
 public class ChechikEstimator {
     private final ImmutableGraph graph;
@@ -23,13 +23,9 @@ public class ChechikEstimator {
     private int numberOfBFS = 0;
     private int[] farness;
 
-    public int[] getSamples() {
-        return ArrayUtils.toPrimitive(s.toArray(new Integer[s.size()]));
-    }
+    public int[] getSamples() {return ArrayUtils.toPrimitive(s.toArray(new Integer[s.size()]));}
     public int[] getFarness() {return farness;}
-
     public int getNumberOfBFS() {return numberOfBFS;}
-
     public double[] getProbabilities() {return ArrayUtils.toPrimitive(sp.toArray(new Double[sp.size()]));}
     public boolean[] getExact() {return exact;}
 
@@ -38,7 +34,7 @@ public class ChechikEstimator {
         this.lambda = new double[graph.numNodes()];
         this.distance = new int[graph.numNodes()];
         this.probabilities = new double[graph.numNodes()];
-        this.k = (int)Math.ceil(1.0D / Math.pow(epsilon, 2));
+        this.k = (int)(Math.ceil(Math.log(graph.numNodes()) / Math.pow(epsilon, 2)));
         this.exact = new boolean[graph.numNodes()];
         this.farness = new int[graph.numNodes()];
     }
@@ -59,9 +55,8 @@ public class ChechikEstimator {
         }
     }
 
-
     private void updateLambda() {
-        int INITIAL_SET_SIZE = 10;
+        int INITIAL_SET_SIZE = (int)Math.ceil(log(graph.numNodes(), 2));
         numberOfBFS = INITIAL_SET_SIZE;
         final int[] samples = new Random().ints(0, graph.numNodes()).distinct().limit(INITIAL_SET_SIZE).toArray();
         for (int u: samples) { // TODO parallel
@@ -73,6 +68,10 @@ public class ChechikEstimator {
                 this.lambda[v] = Math.max(this.lambda[v], (double)distance[v] / (double)d);
             }
         }
+    }
+
+    private static int log(int x, int base)  {
+        return (int) (Math.log(x) / Math.log(base));
     }
 
     private int BFS(int source) {

@@ -1,4 +1,3 @@
-import it.unimi.dsi.io.OutputBitStream;
 import it.unimi.dsi.webgraph.ArcListASCIIGraph;
 import it.unimi.dsi.webgraph.BVGraph;
 import it.unimi.dsi.webgraph.ImmutableGraph;
@@ -10,8 +9,9 @@ import java.io.IOException;
  */
 public class GraphBuilder {
     public static void main(String[] args) throws IOException {
-        String graphBaseName = "./Graphs/foldoc/foldoc.txt";
+        String graphName = "twitter";
+        String graphBaseName = "./Graphs/"+graphName+"/"+graphName+".txt";
         ImmutableGraph graph = ArcListASCIIGraph.loadOffline(graphBaseName);
-        BVGraph.store(graph, "./Graphs/foldoc/foldoc");
+        BVGraph.store(graph, "./Graphs/"+graphName+"/"+graphName);
     }
 }

@@ -39,7 +39,6 @@ public class ChechikFarnessEstimator {
     private boolean[] exact;
     private int numberOfBFS = 0;
     private int[] farness;
-    private GTLoader loader;
 
     public double[] getApxFarness() {return apxFarness;}
 
@@ -51,18 +50,12 @@ public class ChechikFarnessEstimator {
 
     public void setEpsilon(double epsilon) {this.epsilon = epsilon;}
 
-    public ChechikFarnessEstimator(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, double epsilon, String graphName) {
+    public ChechikFarnessEstimator(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, double epsilon) {
         this.graph = graph;
         this.pl = pl;
         this.numberOfThreads = (numberOfThreads) == 0 ? getRuntime().availableProcessors() : numberOfThreads;
         this.epsilon = epsilon;
         this.apxFarness = new double[this.graph.numNodes()];
-        this.loader = new GTLoader(graphName, graph.numNodes());
-        try {
-            loader.load();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     public void compute() throws InterruptedException {
@@ -156,13 +149,6 @@ public class ChechikFarnessEstimator {
                 }
 
                 exact[v] = true;
-
-              /*  double correctClos = loader.getCloseness()[v];
-                double computedClos = 1.0D / (double) farness[v];
-                if (!(correctClos == computedClos)) {
-                    System.out.println("Error " + correctClos + " vs " + computedClos+"\nNode = " + v);
-                }*/
-
                 if (ChechikFarnessEstimator.this.pl != null) {
                     synchronized (ChechikFarnessEstimator.this.pl) {
                         ChechikFarnessEstimator.this.pl.update();
@@ -175,10 +161,5 @@ public class ChechikFarnessEstimator {
     private synchronized void updateApxFarness(int source, int dest, double d, double p) {
         farness[source] += (double) d;
         apxFarness[dest] += d / p;
-    }
-
-
-    private void print(String s) {
-        System.out.println(s);
     }
 }

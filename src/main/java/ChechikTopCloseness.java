@@ -23,12 +23,13 @@ public class ChechikTopCloseness {
     private int[] distance;
     private TreeSet<Integer> topC;
     private int numberOfBFS;
+    private int numberOfBFSForApx;
     private int[] farness;
     private TreeSet<Integer> toReturnTopK;
 
-    public ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, int k, String graphName) {
+    public ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, int k) {
         this.graph = graph;
-        this.estimator = new ChechikFarnessEstimator(graph, pl, numberOfThreads, epsilon, graphName);
+        this.estimator = new ChechikFarnessEstimator(graph, pl, numberOfThreads, epsilon);
         this.sorter = new Sorter(this.graph);
         this.k = k;
         this.distance = new int[graph.numNodes()];
@@ -41,32 +42,13 @@ public class ChechikTopCloseness {
 
     public int[] getFarness() {return this.farness;}
 
-    public Integer[] getTopk() {
-       // System.out.println("K = " + k + " To = " + topC.size());
-     /*   TreeSet<Integer> toReturn = new TreeSet<>(topC.comparator());
-        int i = 0;
-        while (!topC.isEmpty()) {
-            Integer v = topC.pollFirst();
-            if (i >= k) {
-              //  if (apxCloseness[v] < apxCloseness[toReturn.last()]) {
-                    break;
-             //   }
-            }
-            else {
-                toReturn.add(v);
-                ++i;
-            }
-            if (!exact[toReturn.last()]) System.out.println("Una centrality nel top k set non è esatta!");
-
-        }
-        return toReturn.toArray(new Integer[toReturn.size()]);*/
-      // return topC.toArray(new Integer[topC.size()]);
-        return toReturnTopK.toArray(new Integer[toReturnTopK.size()]);
-    }
+    public Integer[] getTopk() {return toReturnTopK.toArray(new Integer[toReturnTopK.size()]);}
 
     public double[] getApxCloseness() {return apxCloseness;}
 
     public int getNumberOfBFS() {return numberOfBFS;}
+
+    public int getNumberOfBFSForApx() {return numberOfBFSForApx;}
 
     public void compute() throws InterruptedException {
         this.estimator.compute();
@@ -86,6 +68,7 @@ public class ChechikTopCloseness {
         }
 
         numberOfBFS = estimator.getNumberOfBFS();
+        numberOfBFSForApx = numberOfBFS;
         int to = k;
         int from = 0;
         while (toReturnTopK.size() < k) {

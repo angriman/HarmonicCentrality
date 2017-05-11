@@ -32,6 +32,7 @@ public class Main {
                 new Parameter[]{
                         new Switch("expand", 'e', "expand", "Expand the graph to increase speed (no compression)."),
                         new Switch("mapped", 'm', "mapped", "Use loadMapped() to load the graph."),
+                        new Switch("text", 't', "text", "Load a graph from a arc list txt file."),
                         new FlaggedOption("threads", JSAP.INTSIZE_PARSER, "0", false, 'T', "threads", "The number of threads to be used. If 0, the number will be estimated automatically."),
                         new UnflaggedOption("graphBasename", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, true, false, "The basename of the graph."),
                         //new UnflaggedOption("k", JSAP.INTSIZE_PARSER, JSAP.NO_DEFAULT, true, false, "The number of top closeness centralities to be computed."),
@@ -61,7 +62,7 @@ public class Main {
         String resultPath = "./results/" + graphName + "_chechik" + ".json";
         JSONObject obj = new JSONObject();
         for (int k : topk) {
-            ChechikTopCloseness topCloseness = new ChechikTopCloseness(graph, progressLogger, numberOfThreads, k, graphName);
+            ChechikTopCloseness topCloseness = new ChechikTopCloseness(graph, progressLogger, numberOfThreads, k);
             try {
                 topCloseness.compute();
                 GTLoader loader = new GTLoader(graphName, graph.numNodes());
@@ -71,16 +72,12 @@ public class Main {
                     e.printStackTrace();
                 }
                 Integer[] computed_top_k = topCloseness.getTopk();
-                //  double[] computedtopk = topCloseness.getApxCloseness();
-                // double[] closeness = loader.getCloseness();
                 int[] exact = loader.getTopKNodes(k);
 
                 Set<Integer> computed_set = new HashSet<>(Arrays.asList(computed_top_k));
                 Set<Integer> exact_set = new HashSet<>(Arrays.asList(ArrayUtils.toObject(exact)));
-                double size = computed_set.size();//Math.min(computed_set.size(), k);
-                //double size = exact_set.size();
+                double size = computed_set.size();
                 computed_set.retainAll(exact_set);
-                //exact_set.retainAll(computed_set);
 
                 double precision = (double) computed_set.size() / k;
                 if (precision != 1.0D) {
@@ -91,6 +88,7 @@ public class Main {
                 System.out.println("Precision = " + precision);
                 System.out.println("Computed set size = " + (int)size + " exact top k size = " + exact_set.size());
                 System.out.println("Number of BFS = " + topCloseness.getNumberOfBFS());
+                System.out.println("BFS for approximation = " + topCloseness.getNumberOfBFSForApx() + "\nRemaining BFS = " + (topCloseness.getNumberOfBFS() - topCloseness.getNumberOfBFSForApx()));
                 obj.put(String.valueOf(k), topCloseness.getNumberOfBFS());
 
             } catch (InterruptedException e) {

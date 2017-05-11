@@ -11,9 +11,9 @@ import java.util.TreeSet;
  */
 public class GraphSorter {
     public static void main(String[] args) throws IOException {
-        String graphName = "wordassociation-2011";
+        String graphName = "twitter";
         File input = new File("./Graphs/"+graphName+"/"+graphName+".txt");
-        File output = new File("./Graphs/"+graphName+"/"+graphName+".txt");
+        File output = new File("./Graphs/"+graphName+"/"+"sorted_"+graphName+".txt");
         PrintWriter printWriter = new PrintWriter(output);
         Scanner in = new Scanner(input);
         TreeSet<Arch> treeSet = new TreeSet<>();
@@ -45,10 +45,6 @@ public class GraphSorter {
                 printWriter.println();
             }
         }
-
-        //ImmutableGraph graph = ArcListASCIIGraph.loadSequential(graphName);
-        //BVGraph graph = BVGraph.loadOffline(graphName, null);
-        //graph.writeOffsets(new OutputBitStream(graphName.toString()+".offsets"), null);
         printWriter.close();
         in.close();
     }
