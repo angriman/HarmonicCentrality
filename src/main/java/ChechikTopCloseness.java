@@ -4,8 +4,16 @@ import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
 import it.unimi.dsi.webgraph.NodeIterator;
 
-import java.util.Arrays;
-import java.util.TreeSet;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static java.lang.Runtime.getRuntime;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 
 /**
  * Created by Eugenio on 4/27/17.
@@ -15,7 +23,7 @@ public class ChechikTopCloseness {
     private final ImmutableGraph graph;
     private final ChechikFarnessEstimator estimator;
     private final Sorter sorter;
-    private static final double epsilon = 0.05D;
+    private static final double epsilon = 0.1D;
     private boolean[] exact;
     private final int k;
     private double[] apxCloseness;
@@ -26,8 +34,9 @@ public class ChechikTopCloseness {
     private int numberOfBFSForApx;
     private int[] farness;
     private TreeSet<Integer> toReturnTopK;
+   // private final GTLoader loader;
 
-    public ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, int k) {
+    ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, int k) throws IOException {
         this.graph = graph;
         this.estimator = new ChechikFarnessEstimator(graph, pl, numberOfThreads, epsilon);
         this.sorter = new Sorter(this.graph);
@@ -38,6 +47,8 @@ public class ChechikTopCloseness {
             return first == 0 ? o1.compareTo(o2) : first;
         });
         toReturnTopK = new TreeSet<>(topC.comparator());
+       // loader = new GTLoader("gnutella", graph.numNodes());
+       // loader.load();
     }
 
     public int[] getFarness() {return this.farness;}
@@ -71,6 +82,7 @@ public class ChechikTopCloseness {
         numberOfBFSForApx = numberOfBFS;
         int to = k;
         int from = 0;
+
         while (toReturnTopK.size() < k) {
             computeRemainingCloseness(from, to);
             double limit = limit(to-1);
@@ -87,10 +99,11 @@ public class ChechikTopCloseness {
             if (!exact[v]) { // BFS not computed
                 apxCloseness[v] = 1.0D / (double)BFS(v);
                 ++numberOfBFS;
+                exact[v] = true;
             }
             else {
-                if (farness[v] == 0 || !exact[v]) {System.out.println("Error!"); System.exit(1);}
-                apxCloseness[v] = 1.0D / (double)farness[v];
+               // if (farness[v] == 0 || !exact[v]) {System.out.println("Error!"); System.exit(1);}
+                apxCloseness[v] = farness[v] == 0 ? 0 : 1.0D / (double)farness[v];
             }
             topC.add(v);
         }

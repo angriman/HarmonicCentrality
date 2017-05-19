@@ -3,7 +3,6 @@ import it.unimi.dsi.logging.ProgressLogger;
 import it.unimi.dsi.webgraph.ImmutableGraph;
 import it.unimi.dsi.webgraph.LazyIntIterator;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -16,9 +15,9 @@ import static java.util.Arrays.fill;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
 /**
- * Created by Eugenio on 4/26/17.
+ * Wrote by Eugenio on 4/26/17.
  */
-public class ChechikFarnessEstimator {
+class ChechikFarnessEstimator {
     /**
      * The graph under examination.
      */
@@ -40,17 +39,15 @@ public class ChechikFarnessEstimator {
     private int numberOfBFS = 0;
     private int[] farness;
 
-    public double[] getApxFarness() {return apxFarness;}
+    double[] getApxFarness() {return apxFarness;}
 
-    public int[] getFarness() {return farness;}
+    int[] getFarness() {return farness;}
 
-    public int getNumberOfBFS() {return numberOfBFS;}
+    int getNumberOfBFS() {return numberOfBFS;}
 
-    public boolean[] getExact() {return exact;}
+    boolean[] getExact() {return exact;}
 
-    public void setEpsilon(double epsilon) {this.epsilon = epsilon;}
-
-    public ChechikFarnessEstimator(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, double epsilon) {
+    ChechikFarnessEstimator(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, double epsilon) {
         this.graph = graph;
         this.pl = pl;
         this.numberOfThreads = (numberOfThreads) == 0 ? getRuntime().availableProcessors() : numberOfThreads;
@@ -58,7 +55,7 @@ public class ChechikFarnessEstimator {
         this.apxFarness = new double[this.graph.numNodes()];
     }
 
-    public void compute() throws InterruptedException {
+    void compute() throws InterruptedException {
         fill(apxFarness, 0);
         ChechikEstimator estimator = new ChechikEstimator(graph, epsilon);
         estimator.computeCoefficients();
@@ -80,7 +77,7 @@ public class ChechikFarnessEstimator {
         }
 
         ExecutorService var11 = newFixedThreadPool(getRuntime().availableProcessors());
-        ExecutorCompletionService executorCompletionService = new ExecutorCompletionService(var11);
+        ExecutorCompletionService<Void> executorCompletionService = new ExecutorCompletionService<>(var11);
 
         int e = thread.length;
 

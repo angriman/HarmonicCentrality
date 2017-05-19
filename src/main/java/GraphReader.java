@@ -12,18 +12,17 @@ public class GraphReader {
     private final ImmutableGraph graph;
 
     public static void main(String args[]) {
-        String graphName = "wordassociation-2011";
+        String graphName = "DC";
         try {
             ImmutableGraph g = ImmutableGraph.loadMapped("./Graphs/"+graphName+"/"+graphName, null);
             g = Transform.symmetrize(g);
-            File output = new File("./Graphs/"+graphName+"/"+graphName+".txt");
+            File output = new File("./Graphs/"+graphName+"/new_"+graphName+".txt");
             PrintWriter printWriter = new PrintWriter(output);
 
             for (int next = 0; next < g.numNodes(); ++next) {
                 LazyIntIterator succ = g.successors(next);
                 int s;
                 while ((s = succ.nextInt()) != -1) {
-                    System.out.println(next);
                     printWriter.println(next + " " + s);
                 }
             }

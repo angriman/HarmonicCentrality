@@ -17,7 +17,7 @@ public class ExactCloseness {
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) throws IOException {
-        String grapName = "twitter";
+        String grapName = "gnutella";
         String graphBasename = "./Graphs/" + grapName + "/" + grapName;
         ProgressLogger progressLogger = new ProgressLogger(LOGGER, "nodes");
         progressLogger.displayFreeMemory = progressLogger.displayLocalSpeed = true;
@@ -49,6 +49,7 @@ public class ExactCloseness {
         JSONObject obj = new JSONObject();
         obj.put("nodes", sortedNodes);
         obj.put("closeness", sortedCloseness);
+        obj.put("farness", geo.farness);
         try (FileWriter file = new FileWriter(path)) {
             obj.write(file);
         }

@@ -1,32 +1,47 @@
-
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Scanner;
 import java.util.TreeSet;
 
 /**
- * Created by Eugenio on 3/27/17.
+ * Wrote by Eugenio on 3/27/17.
  */
 public class GraphSorter {
     public static void main(String[] args) throws IOException {
-        String graphName = "twitter";
+        String graphName = "ca-condmat";
         File input = new File("./Graphs/"+graphName+"/"+graphName+".txt");
         File output = new File("./Graphs/"+graphName+"/"+"sorted_"+graphName+".txt");
         PrintWriter printWriter = new PrintWriter(output);
         Scanner in = new Scanner(input);
         TreeSet<Arch> treeSet = new TreeSet<>();
-
+        int scannedLines = 0;
+        int addedArcs = 0;
         while (in.hasNextLine()) {
+            ++scannedLines;
             String line = in.nextLine();
             Scanner scanLine = new Scanner(line);
-            int from = scanLine.nextInt();
-            int to = scanLine.nextInt();
-            Arch arch = new Arch(from, to);
-            treeSet.add(arch);
-            scanLine.close();
+            if (!line.contains(".")) {
+                int from = scanLine.nextInt();
+                if (scanLine.hasNextInt()) {
+                    int to = Math.abs(scanLine.nextInt());
+                    Arch arch = new Arch(from, to);
+                    int prevSize = treeSet.size();
+                    if (treeSet.contains(arch)) {
+                        System.out.println("Duplicate arc: " + arch.toString());
+                    }
+                    treeSet.add(arch);
+                    if (treeSet.size() > prevSize) {
+                        ++addedArcs;
+                    }
+                    scanLine.close();
+                }
+            }
         }
+
+        System.out.println("Scanned lines = " + scannedLines + " Added arcs = " + addedArcs);
 
         Iterator<Arch> iterator = treeSet.descendingIterator();
         Arch first = iterator.next();
@@ -61,23 +76,36 @@ public class GraphSorter {
     }
 
     private static class Arch implements Comparable<Arch> {
-        private int from = 0;
-        private int to = 0;
+        private final int from;
+        private final int to;
 
-        public Arch(int from, int to) {
+        Arch(int from, int to) {
             this.from = from;
             this.to = to;
         }
 
-        public int getFrom() {return from;}
-        public int getTo() {return to;}
-
+        int getFrom() {return from;}
+        int getTo() {return to;}
 
 
         @Override
         public int compareTo(Arch o) {
             int first = new Integer(o.getFrom()).compareTo(this.from);
             return (first == 0) ? new Integer(o.getTo()).compareTo(this.to) : first;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof Arch) {
+                Arch comp = (Arch)obj;
+                return comp.from == this.from && comp.to == this.to;
+            }
+            return false;
+        }
+
+        @Override
+        public String toString() {
+            return this.from + " " + this.to;
         }
     }
 }

@@ -23,6 +23,7 @@ public class GeometricCentralities {
     private final ImmutableGraph graph;
     final double[] harmonic;
     final double[] closeness;
+    final int[] farness;
     private final double[] lin;
     private final double[] exponential;
     private double alpha;
@@ -39,6 +40,7 @@ public class GeometricCentralities {
         this.graph = graph;
         this.harmonic = new double[graph.numNodes()];
         this.closeness = new double[graph.numNodes()];
+        this.farness = new int[graph.numNodes()];
         this.reachable = new long[graph.numNodes()];
         this.exponential = new double[graph.numNodes()];
         this.alpha = 0.5D;
@@ -182,6 +184,7 @@ public class GeometricCentralities {
                             GeometricCentralities.this.closeness[curr] += (double)d;
                             GeometricCentralities.this.harmonic[curr] += hd;
                             GeometricCentralities.this.exponential[curr] += ed;
+                            GeometricCentralities.this.farness[curr] += d;
                         }
                     }
                 }
