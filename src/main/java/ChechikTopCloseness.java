@@ -5,6 +5,8 @@ import it.unimi.dsi.webgraph.LazyIntIterator;
 import it.unimi.dsi.webgraph.NodeIterator;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -16,9 +18,9 @@ import static java.lang.Runtime.getRuntime;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
 /**
- * Created by Eugenio on 4/27/17.
+ * Wrote by Eugenio on 4/27/17.
  */
-public class ChechikTopCloseness {
+class ChechikTopCloseness {
 
     private final ImmutableGraph graph;
     private final ChechikFarnessEstimator estimator;
@@ -29,12 +31,13 @@ public class ChechikTopCloseness {
     private double[] apxCloseness;
     private Integer[] nodes;
     private int[] distance;
-    private TreeSet<Integer> topC;
+    private final TreeSet<Integer> topC;
     private int numberOfBFS;
     private int numberOfBFSForApx;
     private int[] farness;
     private TreeSet<Integer> toReturnTopK;
-   // private final GTLoader loader;
+    private final int availableProcessors;
+    private final AtomicInteger next;
 
     ChechikTopCloseness(ImmutableGraph graph, ProgressLogger pl, int numberOfThreads, int k) throws IOException {
         this.graph = graph;
@@ -42,27 +45,28 @@ public class ChechikTopCloseness {
         this.sorter = new Sorter(this.graph);
         this.k = k;
         this.distance = new int[graph.numNodes()];
-        topC = new TreeSet<>((o1, o2) -> {
+        this.topC = new TreeSet<>((o1, o2) -> {
             int first = new Double(apxCloseness[o2]).compareTo(apxCloseness[o1]);
             return first == 0 ? o1.compareTo(o2) : first;
         });
-        toReturnTopK = new TreeSet<>(topC.comparator());
-       // loader = new GTLoader("gnutella", graph.numNodes());
-       // loader.load();
+        this.toReturnTopK = new TreeSet<>(topC.comparator());
+        this.availableProcessors = getRuntime().availableProcessors();
+        this.next = new AtomicInteger(0);
     }
 
-    public int[] getFarness() {return this.farness;}
+    int getNumberOfBFS() {return numberOfBFS;}
 
-    public Integer[] getTopk() {return toReturnTopK.toArray(new Integer[toReturnTopK.size()]);}
+    int getNumberOfBFSForApx() {return numberOfBFSForApx;}
 
-    public double[] getApxCloseness() {return apxCloseness;}
+    void compute() throws InterruptedException {
+        ThreadMXBean bean = ManagementFactory.getThreadMXBean();
 
-    public int getNumberOfBFS() {return numberOfBFS;}
-
-    public int getNumberOfBFSForApx() {return numberOfBFSForApx;}
-
-    public void compute() throws InterruptedException {
+        long time = -bean.getCurrentThreadCpuTime();
         this.estimator.compute();
+        time += bean.getCurrentThreadCpuTime();
+        System.out.println("Approximation time = " + time);
+
+        time = -bean.getCurrentThreadCpuTime();
         this.exact = this.estimator.getExact();
         double[] apxFarness = this.estimator.getApxFarness();
         this.apxCloseness = new double[graph.numNodes()];
@@ -78,22 +82,116 @@ public class ChechikTopCloseness {
             apxCloseness[i] = 1.0D / apxFarness[i];
         }
 
+        time += bean.getCurrentThreadCpuTime();
+        System.out.println("Pre processing time = " + time);
         numberOfBFS = estimator.getNumberOfBFS();
         numberOfBFSForApx = numberOfBFS;
         int to = k;
         int from = 0;
-
-        while (toReturnTopK.size() < k) {
+        time = -bean.getCurrentThreadCpuTime();
+        startComputingCloseness();
+        /*while (toReturnTopK.size() < k) {
             computeRemainingCloseness(from, to);
             double limit = limit(to-1);
             updateTopK(limit);
             from = to;
             ++to;
+        }*/
+        time += bean.getCurrentThreadCpuTime();
+        System.out.println("Remaining BFS time time = " + time);
+    }
+
+    private void startComputingCloseness() {
+        ChechikTopCloseness.BFSThread[] thread = new ChechikTopCloseness.BFSThread[this.availableProcessors];
+        for (int i = 0; i < thread.length; ++i) {
+            thread[i] = new ChechikTopCloseness.BFSThread();
+        }
+
+        ExecutorService var11 = newFixedThreadPool(getRuntime().availableProcessors());
+        ExecutorCompletionService<Void> executorCompletionService = new ExecutorCompletionService<>(var11);
+
+        int e = thread.length;
+
+        while (e-- != 0) {
+            executorCompletionService.submit(thread[e]);
+        }
+
+        try {
+            e = thread.length;
+            while (e-- != 0) {
+                executorCompletionService.take().get();
+            }
+        } catch (ExecutionException var9) {
+            Throwable cause = var9.getCause();
+            throw cause instanceof RuntimeException ? (RuntimeException) cause : new RuntimeException(cause.getMessage(), cause);
+        } catch (InterruptedException e1) {
+            e1.printStackTrace();
+        } finally {
+            var11.shutdown();
+        }
+    }
+
+    private final class BFSThread implements Callable<Void> {
+        private final IntArrayFIFOQueue queue;
+        private final int[] distance;
+
+        private BFSThread() {
+            this.distance = new int[ChechikTopCloseness.this.graph.numNodes()];
+            this.queue = new IntArrayFIFOQueue();
+        }
+
+        public Void call() {
+            int[] distance = this.distance;
+            IntArrayFIFOQueue queue = this.queue;
+            ImmutableGraph graph = ChechikTopCloseness.this.graph.copy();
+            int l;
+            while (true) {
+                int i = ChechikTopCloseness.this.next.getAndIncrement();
+                l = i;
+                if (toReturnTopK.size() >= k || i >= graph.numNodes()) {
+                    return null;
+                }
+
+                int v = nodes[i];
+                int total_distance = 0;
+
+                queue.clear();
+                queue.enqueue(v);
+                Arrays.fill(distance, -1);
+                distance[v] = 0;
+
+                while(!queue.isEmpty()) {
+                    int node = queue.dequeueInt();
+                    int d = distance[node] + 1;
+                    LazyIntIterator successors = graph.successors(node);
+
+                    int s;
+                    while((s = successors.nextInt()) != -1) {
+                        if(distance[s] == -1) {
+                            queue.enqueue(s);
+                            distance[s] = d;
+                            total_distance += d;
+                        }
+                    }
+                }
+                updateAfterBFS(v, total_distance, l);
+            }
+        }
+    }
+
+    private synchronized void updateAfterBFS(int v, int d, int l) {
+        topC.add(v);
+        exact[v] = true;
+        apxCloseness[v] = 1.0D / (double)d;
+        ++numberOfBFS;
+        if (l >= k-1) {
+            updateTopK(limit(l));
         }
     }
 
     private void computeRemainingCloseness(int from, int to) {
         this.farness = estimator.getFarness();
+
         for (int i = from; i < to; ++i) {
             int v = nodes[i];
             if (!exact[v]) { // BFS not computed
@@ -102,14 +200,14 @@ public class ChechikTopCloseness {
                 exact[v] = true;
             }
             else {
-               // if (farness[v] == 0 || !exact[v]) {System.out.println("Error!"); System.exit(1);}
+               // if (farness[v] == 0) {System.out.println("Error!"); System.exit(1);}
                 apxCloseness[v] = farness[v] == 0 ? 0 : 1.0D / (double)farness[v];
             }
             topC.add(v);
         }
     }
 
-    private void updateTopK(double limit) {
+    private synchronized void updateTopK(double limit) {
         while (apxCloseness[topC.first()] >= limit && !topC.isEmpty()) {
             toReturnTopK.add(topC.pollFirst());
         }

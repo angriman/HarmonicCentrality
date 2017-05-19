@@ -122,9 +122,7 @@ class ChechikEstimator {
                     return null;
                 }
 
-
                 int v = samples[i];
-
                 int total_distance = 0;
 
                 queue.clear();
@@ -136,8 +134,8 @@ class ChechikEstimator {
                     int node = queue.dequeueInt();
                     int d = distance[node] + 1;
                     LazyIntIterator successors = graph.successors(node);
-
                     int s;
+
                     while((s = successors.nextInt()) != -1) {
                         if(distance[s] == -1) {
                             queue.enqueue(s);
@@ -147,6 +145,7 @@ class ChechikEstimator {
                         }
                     }
                 }
+
                 exact[v] = true;
                 for (int w = 0; w < graph.numNodes(); ++w) {
                     updateLambda(w, total_distance, distance);
