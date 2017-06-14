@@ -98,7 +98,7 @@ class ChechikTopCloseness {
             ++to;
         }*/
         time += bean.getCurrentThreadCpuTime();
-        System.out.println("Remaining BFS time time = " + time);
+        System.out.println("Remaining BFS time = " + time);
     }
 
     private void startComputingCloseness() {
