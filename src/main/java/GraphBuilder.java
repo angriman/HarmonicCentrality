@@ -8,7 +8,7 @@ import java.util.*;
  */
 public class GraphBuilder {
     public static void main(String[] args) throws IOException {
-        String graphName = "gnutella2";
+        String graphName = "RI";
         String graphBaseName = "./Graphs/"+graphName+"/"+graphName;
         //DataInputStream dataIn = new DataInputStream(new FileInputStream(graphBaseName));
        // ArcListASCIIGraph graph = new ArcListASCIIGraph(dataIn, 0);

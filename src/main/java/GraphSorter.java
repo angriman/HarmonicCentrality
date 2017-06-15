@@ -11,7 +11,7 @@ import java.util.TreeSet;
  */
 public class GraphSorter {
     public static void main(String[] args) throws IOException {
-        String graphName = "ca-condmat";
+        String graphName = "RI";
         File input = new File("./Graphs/"+graphName+"/"+graphName+".txt");
         File output = new File("./Graphs/"+graphName+"/"+"sorted_"+graphName+".txt");
         PrintWriter printWriter = new PrintWriter(output);
@@ -19,26 +19,30 @@ public class GraphSorter {
         TreeSet<Arch> treeSet = new TreeSet<>();
         int scannedLines = 0;
         int addedArcs = 0;
+        boolean jump = false;
         while (in.hasNextLine()) {
-            ++scannedLines;
-            String line = in.nextLine();
-            Scanner scanLine = new Scanner(line);
-            if (!line.contains(".")) {
-                int from = scanLine.nextInt();
-                if (scanLine.hasNextInt()) {
-                    int to = Math.abs(scanLine.nextInt());
-                    Arch arch = new Arch(from, to);
-                    int prevSize = treeSet.size();
-                    if (treeSet.contains(arch)) {
-                        System.out.println("Duplicate arc: " + arch.toString());
+            if (!jump) {
+                ++scannedLines;
+                String line = in.nextLine();
+                Scanner scanLine = new Scanner(line);
+                if (!line.contains(".")) {
+                    int from = scanLine.nextInt();
+                    if (scanLine.hasNextInt()) {
+                        int to = Math.abs(scanLine.nextInt());
+                        Arch arch = new Arch(from, to);
+                        int prevSize = treeSet.size();
+                        if (treeSet.contains(arch)) {
+                            System.out.println("Duplicate arc: " + arch.toString());
+                        }
+                        treeSet.add(arch);
+                        if (treeSet.size() > prevSize) {
+                            ++addedArcs;
+                        }
+                        scanLine.close();
                     }
-                    treeSet.add(arch);
-                    if (treeSet.size() > prevSize) {
-                        ++addedArcs;
-                    }
-                    scanLine.close();
                 }
             }
+            jump = !jump;
         }
 
         System.out.println("Scanned lines = " + scannedLines + " Added arcs = " + addedArcs);

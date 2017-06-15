@@ -208,7 +208,7 @@ class ChechikTopCloseness {
     }
 
     private synchronized void updateTopK(double limit) {
-        while (apxCloseness[topC.first()] >= limit && !topC.isEmpty()) {
+        while (!topC.isEmpty() && apxCloseness[topC.first()] >= limit && !topC.isEmpty()) {
             toReturnTopK.add(topC.pollFirst());
         }
     }

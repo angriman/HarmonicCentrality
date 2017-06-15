@@ -42,6 +42,7 @@ class ChechikEstimator {
         this.graph = graph;
         this.lambda = new double[graph.numNodes()];
         this.probabilities = new double[graph.numNodes()];
+        // TODO: reduce k and check correctness
         this.k = (int)(Math.ceil(Math.log(graph.numNodes()) / Math.pow(epsilon, 2)));
         this.exact = new boolean[graph.numNodes()];
         this.farness = new int[graph.numNodes()];
